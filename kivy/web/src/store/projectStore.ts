@@ -10,6 +10,8 @@ interface ProjectState {
   replaceProject(project: Project): void; resizeScene(id: string, duration: number): void
   splitScene(id: string, time: number): void; trimClip(id: string, edge: 'left' | 'right', delta: number): void
   moveClip(id: string, trackId: string, start: number): void; undo(): void; redo(): void
+  resizeSceneLeft(id: string, delta: number): void; reorderScene(id: string, targetIndex: number): void
+  duplicateScene(id: string): void; deleteScene(id: string): void; deleteClip(id: string): void; splitClip(id: string, time: number): void
 }
 
 const clone = (project: Project): Project => structuredClone(project)
@@ -35,6 +37,16 @@ export const useProjectStore = create<ProjectState>((set) => {
       throw new Error(`Clip not found: ${id}`)
     }),
     moveClip: (id, trackId, start) => commit((project) => moveClip(project, id, trackId, start)),
+    resizeSceneLeft: (id, delta) => commit((project) => {
+      const index = project.scenes.findIndex((scene) => scene.id === id); if (index <= 0) return
+      const previous = project.scenes[index - 1]; const scene = project.scenes[index]
+      const applied = Math.max(0.5 - previous.duration, Math.min(scene.duration - 0.5, delta)); previous.duration += applied; scene.duration -= applied
+    }),
+    reorderScene: (id, targetIndex) => commit((project) => { const from = project.scenes.findIndex((scene) => scene.id === id); if (from < 0) return; const [scene] = project.scenes.splice(from, 1); project.scenes.splice(Math.max(0, Math.min(project.scenes.length, targetIndex)), 0, scene) }),
+    duplicateScene: (id) => commit((project) => { const index = project.scenes.findIndex((scene) => scene.id === id); if (index < 0) return; const source = project.scenes[index]; project.scenes.splice(index + 1, 0, { ...source, sketchSettings: { ...source.sketchSettings }, id: crypto.randomUUID() }) }),
+    deleteScene: (id) => commit((project) => { const index = project.scenes.findIndex((scene) => scene.id === id); if (index >= 0) project.scenes.splice(index, 1); project.transitions = project.transitions.filter((transition) => transition.fromSceneId !== id && transition.toSceneId !== id) }),
+    deleteClip: (id) => commit((project) => { for (const track of project.audioTracks) { const index = track.clips.findIndex((clip) => clip.id === id); if (index >= 0) { track.clips.splice(index, 1); return } } }),
+    splitClip: (id, time) => commit((project) => { for (const track of project.audioTracks) { const clip = track.clips.find((item) => item.id === id); if (!clip) continue; const local = time - clip.start; const duration = clip.sourceOut - clip.sourceIn; if (local <= 0.001 || local >= duration - 0.001) throw new Error('Playhead must be inside the audio clip'); const right = { ...clip, id: crypto.randomUUID(), start: time, sourceIn: clip.sourceIn + local }; clip.sourceOut = right.sourceIn; track.clips.push(right); track.clips.sort((a, b) => a.start - b.start); return } throw new Error(`Clip not found: ${id}`) }),
     undo: () => set((state) => state.past.length ? { project: clone(state.past.at(-1)!), past: state.past.slice(0, -1), future: [clone(state.project), ...state.future] } : state),
     redo: () => set((state) => state.future.length ? { project: clone(state.future[0]), past: [...state.past, clone(state.project)], future: state.future.slice(1) } : state),
   }

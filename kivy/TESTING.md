@@ -55,3 +55,13 @@ P0 covers derived scene starts, duration ripple, minimum scene duration, continu
 | Overlapping playback | PASS | Playwright observes two simultaneously scheduled AudioBufferSourceNodes. |
 | Live controls and seek | PASS | Track mute, track volume, seek/reschedule, and pause pass in Edge. |
 | Regression/build | PASS | 13/13 Vitest tests, 3/3 Playwright tests, strict production build. |
+
+## Browser P3 — Full timeline interactions
+
+| Check | Result | Evidence |
+|---|---|---|
+| Shared scale/ruler/playhead/zoom | PASS | One time origin drives every lane; Edge zoom test verifies proportional scene widths. |
+| Scene editing | PASS | Edge verifies resize, split, duplicate, reorder, delete, and undo/redo. |
+| Audio editing | PASS | Edge verifies trim, cross-track move, split, and delete. |
+| Shared horizontal layout | PASS | Sticky headers no longer cover time-zero clips; scenes/audio/playhead share the offset. |
+| Regression/build | PASS | 13/13 Vitest tests, 5/5 Playwright tests, strict production build. |

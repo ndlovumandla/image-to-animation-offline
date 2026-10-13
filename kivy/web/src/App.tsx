@@ -8,14 +8,12 @@ import { processSketch } from './engine/sketchProcessor'
 import { projectDuration, sceneStarts } from './engine/timeline'
 import type { Asset } from './engine/types'
 import { useProjectStore } from './store/projectStore'
-import { Waveform } from './components/Waveform'
+import { Timeline } from './components/Timeline'
 
 export function App() {
   const project = useProjectStore((state) => state.project)
   const addImageScene = useProjectStore((state) => state.addImageScene)
   const addAudioTrack = useProjectStore((state) => state.addAudioTrack)
-  const setTrackMuted = useProjectStore((state) => state.setTrackMuted)
-  const setTrackVolume = useProjectStore((state) => state.setTrackVolume)
   const undo = useProjectStore((state) => state.undo)
   const redo = useProjectStore((state) => state.redo)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -86,21 +84,7 @@ export function App() {
       {processing !== null && <div className="mt-3" role="status"><div className="mb-1 text-sm">Tracing sketch… {Math.round(processing * 100)}%</div><div className="h-2 rounded bg-gray-200"><div className="h-2 rounded bg-violet-600" style={{ width: `${processing * 100}%` }} /></div></div>}
       {error && <p role="alert" className="mt-3 rounded bg-red-50 p-3 text-red-700">{error}</p>}
     </section>
-    <section className="mx-auto mt-4 max-w-6xl rounded-xl bg-white p-4 shadow-sm">
-      <h2 className="font-medium">Scenes</h2>
-      <div className="mt-3 flex gap-2">{project.scenes.length ? project.scenes.map((scene, index) => <button key={scene.id} className="min-w-32 rounded-lg bg-violet-50 p-3 text-left ring-1 ring-violet-200" onClick={() => setTime(sceneStarts(project.scenes)[index])}><span className="block font-medium">Scene {index + 1}</span><span className="text-sm text-gray-600">{scene.duration.toFixed(1)}s</span></button>) : <p className="text-sm text-gray-500">Drop images here to start.</p>}</div>
-    </section>
-    <section className="mx-auto mt-4 max-w-6xl rounded-xl bg-[#eceef2] p-4 shadow-sm">
-      <div className="flex items-center justify-between"><h2 className="font-medium">Global audio tracks</h2><label className="cursor-pointer rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white">{audioProcessing ? 'Decoding…' : '+ Add audio'}<input data-testid="audio-input" className="hidden" type="file" accept="audio/*" disabled={audioProcessing} onChange={(event) => void importAudio(event.target.files?.[0])} /></label></div>
-      <div className="mt-3 space-y-2">{project.audioTracks.length ? project.audioTracks.map((track) => {
-        const asset = project.assets[track.clips[0]?.assetId]
-        return <div key={track.id} data-testid="audio-track" className="flex h-20 items-center gap-3 rounded-lg bg-white p-2 ring-1 ring-gray-200">
-          <div className="w-40 truncate text-sm font-medium">{track.name}</div>
-          <button aria-label={`Mute ${track.name}`} aria-pressed={track.muted} className="rounded bg-gray-100 px-2 py-1 text-xs" onClick={() => { const muted = !track.muted; setTrackMuted(track.id, muted); playbackRef.current.setTrack(track.id, muted, track.volume) }}>{track.muted ? 'Unmute' : 'Mute'}</button>
-          <input aria-label={`Volume ${track.name}`} className="w-24 accent-teal-700" type="range" min="0" max="2" step="0.05" value={track.volume} onChange={(event) => { const volume = Number(event.target.value); setTrackVolume(track.id, volume); playbackRef.current.setTrack(track.id, track.muted, volume) }} />
-          <div className="h-14 min-w-0 flex-1 rounded bg-teal-50">{asset?.waveform && <Waveform levels={asset.waveform} />}</div>
-        </div>
-      }) : <p className="text-sm text-gray-500">Add an MP3 or WAV. Audio is independent and can span every scene.</p>}</div>
-    </section>
+    <div className="mx-auto mt-4 flex max-w-6xl justify-end"><label className="cursor-pointer rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white">{audioProcessing ? 'Decoding…' : '+ Add audio'}<input data-testid="audio-input" className="hidden" type="file" accept="audio/*" disabled={audioProcessing} onChange={(event) => void importAudio(event.target.files?.[0])} /></label></div>
+    <Timeline playhead={time} onSeek={(value) => void seek(value)} />
   </main>
 }
