@@ -45,3 +45,13 @@ P0 covers derived scene starts, duration ripple, minimum scene duration, continu
 | Progressive scrubbing | PASS | Playwright verifies start and midpoint differ. |
 | Identical-time pixels | PASS | Scrubbing away and back produces an identical canvas data URL. |
 | Regression/build | PASS | 12/12 Vitest tests, 2/2 Playwright tests, strict production build. |
+
+## Browser P2 — Global audio engine
+
+| Check | Result | Evidence |
+|---|---|---|
+| Decode and buffer cache | PASS | Two generated WAV files decode and register once in Edge. |
+| Multiresolution waveforms | PASS | Worker creates 256/1024/4096-sample levels; known-click bucket test passes. |
+| Overlapping playback | PASS | Playwright observes two simultaneously scheduled AudioBufferSourceNodes. |
+| Live controls and seek | PASS | Track mute, track volume, seek/reschedule, and pause pass in Edge. |
+| Regression/build | PASS | 13/13 Vitest tests, 3/3 Playwright tests, strict production build. |

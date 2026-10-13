@@ -6,6 +6,7 @@ export type TransitionType = 'none' | 'fade' | 'slide' | 'wipe'
 export interface Point { x: number; y: number }
 export interface Stroke { points: Point[]; length: number }
 export interface SketchData { strokes: Stroke[]; totalLength: number; width: number; height: number }
+export interface WaveformLevel { bucketSize: number; min: number[]; max: number[] }
 
 export interface SketchSettings {
   style: SketchStyle; detail: number; lineWidth: number; fillMode: FillMode; showHand: boolean
@@ -20,7 +21,7 @@ export interface AudioClip {
 export interface AudioTrack { id: Id; name: string; muted: boolean; volume: number; clips: AudioClip[] }
 export interface Asset {
   id: Id; kind: 'image' | 'audio'; blobKey: string; name: string;
-  meta: { width?: number; height?: number; duration?: number; sampleRate?: number }; sketchData?: SketchData
+  meta: { width?: number; height?: number; duration?: number; sampleRate?: number }; sketchData?: SketchData; waveform?: WaveformLevel[]
 }
 export interface Project {
   id: Id; name: string; fps: number; width: number; height: number; background: string;
