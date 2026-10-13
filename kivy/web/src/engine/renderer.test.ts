@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { frameState } from './renderer'
+import { frameState, transitionState } from './renderer'
 import { defaultSketchSettings, type Project } from './types'
 
 const project: Project = {
@@ -17,5 +17,12 @@ describe('deterministic frame state', () => {
     expect(frameState(project, 2).drawProgress).toBeCloseTo(2 / 3)
     expect(frameState(project, 4).progress).toBeCloseTo(0.4)
     expect(frameState(project, 6).fillOpacity).toBe(1)
+  })
+})
+
+describe('transition timing', () => {
+  it('activates the configured transition only in the outgoing window', () => {
+    project.transitions = [{ id: 't', fromSceneId: 'a', toSceneId: 'b', type: 'wipe', duration: 1 }]
+    expect(transitionState(project, 2.99)).toBeUndefined(); expect(transitionState(project, 3)?.progress).toBe(0); expect(transitionState(project, 3.5)?.progress).toBe(0.5); expect(transitionState(project, 4)).toBeUndefined()
   })
 })

@@ -65,3 +65,12 @@ P0 covers derived scene starts, duration ripple, minimum scene duration, continu
 | Audio editing | PASS | Edge verifies trim, cross-track move, split, and delete. |
 | Shared horizontal layout | PASS | Sticky headers no longer cover time-zero clips; scenes/audio/playhead share the offset. |
 | Regression/build | PASS | 13/13 Vitest tests, 5/5 Playwright tests, strict production build. |
+
+## Browser P4 — Transitions
+
+| Check | Result | Evidence |
+|---|---|---|
+| Fade/slide/wipe timing | PASS | Vitest verifies transition activation and midpoint progress. |
+| Boundary controls | PASS | Edge cycles none/fade/slide/wipe without blocking resize handles. |
+| Renderer integration | PASS | Transition composition runs inside the same `renderFrame` used by preview. |
+| Regression/build | PASS | 14/14 Vitest tests, 6/6 Playwright tests, strict production build. |

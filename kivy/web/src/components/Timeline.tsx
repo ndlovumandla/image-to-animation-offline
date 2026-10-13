@@ -3,6 +3,7 @@ import { projectDuration, sceneStarts } from '../engine/timeline'
 import { timeToPx, pxToTime } from '../engine/timeScale'
 import { useProjectStore } from '../store/projectStore'
 import { Waveform } from './Waveform'
+import type { TransitionType } from '../engine/types'
 
 interface Props { playhead: number; onSeek(time: number): void }
 type Selection = { kind: 'scene' | 'clip'; id: string } | null
@@ -62,6 +63,7 @@ export function Timeline({ playhead, onSeek }: Props) {
             <div draggable data-testid="scene-drag" onDragStart={(event) => event.dataTransfer.setData('scene', scene.id)} className="flex h-full cursor-grab items-center justify-center px-3 text-center text-sm"><span>Scene {index + 1}<br />{scene.duration.toFixed(2)}s</span></div>
             <div data-testid="scene-right-handle" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize bg-violet-500/50" onPointerDown={(event) => beginHorizontalDrag(event, (delta, alt) => { const targetEnd = snap(starts[index] + scene.duration + delta, alt); actions.resizeScene(scene.id, targetEnd - starts[index]) })} />
           </div>)}
+          {project.scenes.slice(0, -1).map((scene, index) => { const transition = project.transitions.find((item) => item.fromSceneId === scene.id); const types: TransitionType[] = ['none', 'fade', 'slide', 'wipe']; const current = transition?.type ?? 'none'; return <button key={`transition-${scene.id}`} data-testid="transition-marker" title={`Transition: ${current}`} className="absolute -top-4 z-30 h-8 min-w-8 -translate-x-1/2 rounded-full border border-violet-400 bg-white px-1 text-[10px] uppercase shadow" style={{ left: HEADER_WIDTH + timeToPx(starts[index] + scene.duration, pxPerSecond) }} onClick={(event) => { event.stopPropagation(); actions.setTransition(scene.id, types[(types.indexOf(current) + 1) % types.length]) }}>{current === 'none' ? '+' : current}</button> })}
         </div>
         {project.audioTracks.map((track) => <div key={track.id} data-testid="timeline-audio-lane" className="relative h-20 border-b border-gray-300 bg-[#f1f3f5]" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData('clip'); const rect = event.currentTarget.getBoundingClientRect(); if (id) actions.moveClip(id, track.id, snap(pxToTime(event.clientX - rect.left - HEADER_WIDTH, pxPerSecond), event.altKey)) }}>
           <div className="sticky left-0 z-20 flex h-full w-44 items-center gap-2 border-r border-gray-300 bg-white/95 px-2 text-xs"><span className="max-w-16 truncate">{track.name}</span><button aria-label={`Timeline mute ${track.name}`} onClick={() => actions.setTrackMuted(track.id, !track.muted)}>{track.muted ? '🔇' : '🔊'}</button><input aria-label={`Timeline volume ${track.name}`} className="w-16" type="range" min="0" max="2" step="0.05" value={track.volume} onChange={(event) => actions.setTrackVolume(track.id, Number(event.target.value))} /></div>
