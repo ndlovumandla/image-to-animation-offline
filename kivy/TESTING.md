@@ -74,3 +74,13 @@ P0 covers derived scene starts, duration ripple, minimum scene duration, continu
 | Boundary controls | PASS | Edge cycles none/fade/slide/wipe without blocking resize handles. |
 | Renderer integration | PASS | Transition composition runs inside the same `renderFrame` used by preview. |
 | Regression/build | PASS | 14/14 Vitest tests, 6/6 Playwright tests, strict production build. |
+
+## Browser P5 — Persistence
+
+| Check | Result | Evidence |
+|---|---|---|
+| IndexedDB autosave | PASS | Edge displays Saving/Saved and persists the project plus original blobs. |
+| Reload restore | PASS | A real page reload restores scene, media, sketch data, and render registry. |
+| `.sketchproj` download/open | PASS | Playwright downloads the ZIP, deletes the scene, imports it, and recovers the scene and asset. |
+| Missing/corrupt handling | PASS | Import validates project.json, document shape, every referenced asset, and sketch data. |
+| Regression/build | PASS | 14/14 Vitest tests, 7/7 Playwright tests, strict production build. |

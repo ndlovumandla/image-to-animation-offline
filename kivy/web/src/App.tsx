@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { assetRegistry } from './engine/assetRegistry'
 import { audioRegistry } from './engine/audioRegistry'
+import { blobRegistry } from './engine/blobRegistry'
 import { decodeAudio } from './engine/audioProcessor'
 import { PlaybackEngine } from './engine/playbackEngine'
+import { exportProject, importProject, restoreProject, saveProject } from './engine/persistence'
 import { renderFrame } from './engine/renderer'
 import { processSketch } from './engine/sketchProcessor'
 import { projectDuration, sceneStarts } from './engine/timeline'
@@ -14,16 +16,20 @@ export function App() {
   const project = useProjectStore((state) => state.project)
   const addImageScene = useProjectStore((state) => state.addImageScene)
   const addAudioTrack = useProjectStore((state) => state.addAudioTrack)
+  const replaceProject = useProjectStore((state) => state.replaceProject)
   const undo = useProjectStore((state) => state.undo)
   const redo = useProjectStore((state) => state.redo)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const playbackRef = useRef(new PlaybackEngine())
   const animationRef = useRef<number | null>(null)
+  const initializedRef = useRef(false)
   const [time, setTime] = useState(0)
   const [processing, setProcessing] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [audioProcessing, setAudioProcessing] = useState(false)
   const [playing, setPlaying] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'Loading' | 'Saving' | 'Saved' | 'Error'>('Loading')
+  const [ready, setReady] = useState(false)
   const duration = projectDuration(project)
 
   const draw = useCallback(() => {
@@ -32,14 +38,16 @@ export function App() {
   }, [project, time])
   useEffect(() => { draw() }, [draw])
   useEffect(() => () => { if (animationRef.current !== null) cancelAnimationFrame(animationRef.current); playbackRef.current.dispose() }, [])
+  useEffect(() => { if (initializedRef.current) return; initializedRef.current = true; void restoreProject(playbackRef.current.audioContext).then((saved) => { if (saved) replaceProject(saved); setSaveStatus('Saved'); setReady(true) }).catch((reason) => { setError(reason instanceof Error ? reason.message : 'Unable to restore project'); setSaveStatus('Error'); setReady(true) }) }, [replaceProject])
+  useEffect(() => { if (!ready) return; setSaveStatus('Saving'); const timer = window.setTimeout(() => { void saveProject(project).then(() => setSaveStatus('Saved')).catch((reason) => { setError(reason instanceof Error ? reason.message : 'Autosave failed'); setSaveStatus('Error') }) }, 400); return () => clearTimeout(timer) }, [project, ready])
 
   async function importImage(file?: File) {
     if (!file) return
     setError(''); setProcessing(0)
     try {
       const result = await processSketch(file, 0.5, setProcessing)
-      const id = crypto.randomUUID(); const url = URL.createObjectURL(file)
-      const asset: Asset = { id, kind: 'image', blobKey: url, name: file.name, meta: { width: result.image.width, height: result.image.height }, sketchData: result.sketchData }
+      const id = crypto.randomUUID(); blobRegistry.set(id, file)
+      const asset: Asset = { id, kind: 'image', blobKey: id, name: file.name, meta: { width: result.image.width, height: result.image.height }, sketchData: result.sketchData }
       assetRegistry.set(id, result); addImageScene(asset); setTime(sceneStarts([...project.scenes, { id: 'pending', assetId: id, duration: 4, progressStart: 0, progressEnd: 1, sketchSettings: { style: 'pencil', detail: 0.5, lineWidth: 2, fillMode: 'fade', showHand: true } }]).at(-1) ?? 0)
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to process image') } finally { setProcessing(null) }
   }
@@ -49,8 +57,8 @@ export function App() {
     setError(''); setAudioProcessing(true)
     try {
       const { buffer, waveform } = await decodeAudio(file, playbackRef.current.audioContext)
-      const id = crypto.randomUUID(); audioRegistry.set(id, buffer)
-      addAudioTrack({ id, kind: 'audio', blobKey: URL.createObjectURL(file), name: file.name, meta: { duration: buffer.duration, sampleRate: buffer.sampleRate }, waveform })
+      const id = crypto.randomUUID(); audioRegistry.set(id, buffer); blobRegistry.set(id, file)
+      addAudioTrack({ id, kind: 'audio', blobKey: id, name: file.name, meta: { duration: buffer.duration, sampleRate: buffer.sampleRate }, waveform })
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to decode audio') } finally { setAudioProcessing(false) }
   }
 
@@ -64,11 +72,13 @@ export function App() {
     await playbackRef.current.play(project, time >= duration ? 0 : time); setPlaying(true); animationRef.current = requestAnimationFrame(animatePlayback)
   }
   async function seek(value: number) { setTime(value); await playbackRef.current.seek(project, value) }
+  async function downloadProject() { try { const blob = await exportProject(project); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${project.name.replace(/[^a-z0-9_-]+/gi, '_')}.sketchproj`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Project download failed') } }
+  async function openProject(file?: File) { if (!file) return; try { replaceProject(await importProject(file, playbackRef.current.audioContext)); setTime(0); setSaveStatus('Saved') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Project open failed') } }
 
   return <main className="min-h-screen p-6">
     <header className="mx-auto flex max-w-6xl items-center justify-between rounded-xl bg-white p-4 shadow-sm">
-      <div><h1 className="text-xl font-semibold">{project.name}</h1><p className="text-sm text-gray-500">Sketch engine harness · {duration.toFixed(2)} seconds</p></div>
-      <div className="flex gap-2"><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={undo}>Undo</button><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={redo}>Redo</button></div>
+      <div><h1 className="text-xl font-semibold">{project.name}</h1><p className="text-sm text-gray-500">Sketch engine harness · {duration.toFixed(2)} seconds · <span data-testid="save-status">{saveStatus}</span></p></div>
+      <div className="flex gap-2"><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={undo}>Undo</button><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={redo}>Redo</button><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={() => void downloadProject()}>Download project</button><label className="cursor-pointer rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200">Open project<input data-testid="project-input" className="hidden" type="file" accept=".sketchproj" onChange={(event) => void openProject(event.target.files?.[0])} /></label></div>
     </header>
     <section className="mx-auto mt-5 max-w-6xl rounded-xl bg-white p-5 shadow-sm">
       <div className="mx-auto aspect-video max-h-[62vh] overflow-hidden rounded-lg bg-white ring-1 ring-gray-200">
