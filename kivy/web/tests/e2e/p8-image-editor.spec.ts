@@ -1,0 +1,20 @@
+import { expect, test } from '@playwright/test'
+
+test('edits an uploaded image with text and shapes then creates a sketch scene', async ({ page }) => {
+  await page.route('https://api.iconify.design/search**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ icons: ['lucide:graduation-cap'] }) }))
+  await page.goto('/')
+  const png = await page.evaluate(() => {
+    const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180
+    const context=canvas.getContext('2d')!;context.fillStyle='white';context.fillRect(0,0,320,180);context.fillStyle='#2563eb';context.fillRect(90,40,140,100)
+    return canvas.toDataURL('image/png').split(',')[1]
+  })
+  await page.getByTestId('image-input').setInputFiles({ name:'lesson.png', mimeType:'image/png', buffer:Buffer.from(png,'base64') })
+  await expect(page.getByTestId('scene-block')).toHaveCount(1,{timeout:20_000})
+  await page.getByTitle('Edit image').click()
+  await expect(page.getByText('Image editor',{exact:true})).toBeVisible()
+  await expect(page.getByLabel('Search elements')).toBeVisible()
+  await page.getByRole('button',{name:/Magic remover/}).click();await expect(page.getByText('Background removed',{exact:true})).toBeVisible()
+  await page.getByRole('button',{name:'+ Text'}).click();await page.getByRole('button',{name:/Shape/}).click()
+  await page.getByRole('button',{name:'Use in video'}).click()
+  await expect(page.getByTestId('scene-block')).toHaveCount(2,{timeout:20_000})
+})
