@@ -84,3 +84,15 @@ P0 covers derived scene starts, duration ripple, minimum scene duration, continu
 | `.sketchproj` download/open | PASS | Playwright downloads the ZIP, deletes the scene, imports it, and recovers the scene and asset. |
 | Missing/corrupt handling | PASS | Import validates project.json, document shape, every referenced asset, and sketch data. |
 | Regression/build | PASS | 14/14 Vitest tests, 7/7 Playwright tests, strict production build. |
+
+## Browser P6 — MP4 export
+
+| Check | Result | Evidence |
+|---|---|---|
+| WebCodecs feature/config detection | PASS | Edge confirms H.264 and AAC encoder configurations before export. |
+| Real MP4 generation | PASS | Playwright downloads the browser-generated MP4. |
+| Stream verification | PASS | ffprobe reports H.264 video and AAC audio. |
+| Duration and playback | PASS | ffprobe reports 4.00s; Edge loads and plays the downloaded file. |
+| Regression/build | PASS | 14/14 Vitest tests, 8/8 Playwright tests, strict build, 0 audit vulnerabilities. |
+
+`mp4-muxer` emits a deprecation notice in favor of Mediabunny, but remains here because the fixed product specification explicitly requires `mp4-muxer`.
