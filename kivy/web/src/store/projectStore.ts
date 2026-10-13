@@ -1,10 +1,11 @@
 import { produce } from 'immer'
 import { create } from 'zustand'
-import { createEmptyProject, type Project } from '../engine/types'
+import { createEmptyProject, defaultSketchSettings, type Asset, type Project } from '../engine/types'
 import { moveClip, resizeScene, splitScene, trimClip } from '../engine/timeline'
 
 interface ProjectState {
   project: Project; past: Project[]; future: Project[]
+  addImageScene(asset: Asset): void
   replaceProject(project: Project): void; resizeScene(id: string, duration: number): void
   splitScene(id: string, time: number): void; trimClip(id: string, edge: 'left' | 'right', delta: number): void
   moveClip(id: string, trackId: string, start: number): void; undo(): void; redo(): void
@@ -15,6 +16,10 @@ export const useProjectStore = create<ProjectState>((set) => {
   const commit = (mutate: (draft: Project) => void) => set((state) => ({ project: produce(state.project, mutate), past: [...state.past, clone(state.project)], future: [] }))
   return {
     project: createEmptyProject(), past: [], future: [],
+    addImageScene: (asset) => commit((project) => {
+      project.assets[asset.id] = asset
+      project.scenes.push({ id: crypto.randomUUID(), assetId: asset.id, duration: 4, progressStart: 0, progressEnd: 1, sketchSettings: defaultSketchSettings() })
+    }),
     replaceProject: (project) => set({ project: clone(project), past: [], future: [] }),
     resizeScene: (id, duration) => commit((project) => resizeScene(project, id, duration)),
     splitScene: (id, time) => commit((project) => { splitScene(project, id, time) }),

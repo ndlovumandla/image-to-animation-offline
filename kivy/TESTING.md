@@ -35,3 +35,13 @@ Notes:
 | Dependency security audit | PASS | `npm audit`: 0 vulnerabilities. |
 
 P0 covers derived scene starts, duration ripple, minimum scene duration, continuous scene splitting, audio trimming, overlap detection/pushing, cross-track movement, project duration, shared time/pixel conversion, and command-level undo/redo.
+
+## Browser P1 — Sketch engine and pure renderer
+
+| Check | Result | Evidence |
+|---|---|---|
+| Deterministic frame state | PASS | Vitest verifies equal project/time inputs produce equal frame state. |
+| Worker sketch processing | PASS | Edge uploads and traces a generated PNG through the real Web Worker. |
+| Progressive scrubbing | PASS | Playwright verifies start and midpoint differ. |
+| Identical-time pixels | PASS | Scrubbing away and back produces an identical canvas data URL. |
+| Regression/build | PASS | 12/12 Vitest tests, 2/2 Playwright tests, strict production build. |
