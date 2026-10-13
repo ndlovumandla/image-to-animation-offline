@@ -4,6 +4,7 @@ import { timeToPx, pxToTime } from '../engine/timeScale'
 import { useProjectStore } from '../store/projectStore'
 import { Waveform } from './Waveform'
 import type { TransitionType } from '../engine/types'
+import { AssetThumbnail } from './AssetThumbnail'
 
 interface Props { playhead: number; onSeek(time: number): void }
 type Selection = { kind: 'scene' | 'clip'; id: string } | null
@@ -11,7 +12,7 @@ const HEADER_WIDTH = 176
 
 export function Timeline({ playhead, onSeek }: Props) {
   const project = useProjectStore((state) => state.project)
-  const actions = useProjectStore()
+  const actions = useMemo(() => useProjectStore.getState(), [])
   const [pxPerSecond, setPxPerSecond] = useState(80)
   const [selection, setSelection] = useState<Selection>(null)
   const [snapGuide, setSnapGuide] = useState<number | null>(null)
@@ -44,8 +45,8 @@ export function Timeline({ playhead, onSeek }: Props) {
   useEffect(() => { const viewport = scrollRef.current; if (!viewport) return; const x = HEADER_WIDTH + timeToPx(playhead, pxPerSecond); if (x > viewport.scrollLeft + viewport.clientWidth - 80) viewport.scrollTo({ left: x - viewport.clientWidth + 120, behavior: 'smooth' }) }, [playhead, pxPerSecond])
   const selectedClip = selection?.kind === 'clip' ? project.audioTracks.flatMap((track) => track.clips).find((clip) => clip.id === selection.id) : undefined
 
-  return <section className="mx-auto mt-4 max-w-6xl overflow-hidden rounded-xl bg-[#e7e9ee] shadow-sm" data-testid="timeline">
-    <div className="flex items-center justify-between border-b border-gray-300 bg-white px-4 py-2">
+  return <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#e7e9ee]" data-testid="timeline">
+    <div className="flex h-10 shrink-0 items-center justify-between border-b border-gray-300 bg-white px-3">
       <div className="flex gap-2">
         <button onClick={() => { if (selection) selection.kind === 'scene' ? actions.splitScene(selection.id, playhead) : actions.splitClip(selection.id, playhead) }} className="rounded bg-gray-100 px-3 py-1 text-sm">Split</button>
         <button onClick={() => selection?.kind === 'scene' && actions.duplicateScene(selection.id)} className="rounded bg-gray-100 px-3 py-1 text-sm">Duplicate</button>
@@ -54,16 +55,16 @@ export function Timeline({ playhead, onSeek }: Props) {
       </div>
       <label className="flex items-center gap-2 text-sm">Zoom <input aria-label="Timeline zoom" type="range" min="10" max="400" value={pxPerSecond} onChange={(event) => setPxPerSecond(Number(event.target.value))} /></label>
     </div>
-    <div ref={scrollRef} className="overflow-x-auto">
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
       <div className="relative" style={{ width: contentWidth }}>
         <div data-testid="ruler" className="relative h-8 cursor-crosshair border-b border-gray-300 bg-[#f6f7f9]" onPointerDown={(event) => { const rect = event.currentTarget.getBoundingClientRect(); onSeek(pxToTime(event.clientX - rect.left - HEADER_WIDTH, pxPerSecond)) }}>
           {ticks.map((tick) => <div key={tick} className="absolute bottom-0 h-3 border-l border-gray-400 text-[10px] text-gray-600" style={{ left: HEADER_WIDTH + timeToPx(tick, pxPerSecond) }}><span className="absolute -top-4 left-1">{tick}s</span></div>)}
         </div>
-        <div className="relative flex h-24 items-stretch border-b border-gray-300 bg-white" data-testid="scene-lane">
-          <div className="sticky left-0 z-20 w-44 shrink-0 border-r border-gray-300 bg-white/95 px-3 py-2 text-xs font-medium">Scenes</div>
+        <div className="relative flex h-20 items-stretch border-b border-gray-300 bg-white" data-testid="scene-lane">
+          <div className="sticky left-0 z-20 w-44 shrink-0 border-r border-gray-300 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-600">Video</div>
           {project.scenes.map((scene, index) => <div key={scene.id} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData('scene'); if (id) actions.reorderScene(id, index) }} onClick={() => setSelection({ kind: 'scene', id: scene.id })} data-testid="scene-block" className={`relative shrink-0 overflow-hidden rounded-lg border-2 bg-violet-100 ${selection?.id === scene.id ? 'border-violet-600' : 'border-white'}`} style={{ width: timeToPx(scene.duration, pxPerSecond) }}>
             {index > 0 && <div data-testid="scene-left-handle" className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize bg-violet-400/40" onPointerDown={(event) => beginHorizontalDrag(event, (delta) => actions.resizeSceneLeft(scene.id, delta))} />}
-            <div draggable data-testid="scene-drag" onDragStart={(event) => event.dataTransfer.setData('scene', scene.id)} className="flex h-full cursor-grab items-center justify-center px-3 text-center text-sm"><span>Scene {index + 1}<br />{scene.duration.toFixed(2)}s</span></div>
+            <div draggable data-testid="scene-drag" onDragStart={(event) => event.dataTransfer.setData('scene', scene.id)} className="relative h-full cursor-grab"><AssetThumbnail assetId={scene.assetId} /><span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{scene.duration.toFixed(1)}s</span><span className="absolute left-1 top-1 rounded bg-black/55 px-1 text-[10px] text-white">{index + 1}</span></div>
             <div data-testid="scene-right-handle" className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize bg-violet-500/50" onPointerDown={(event) => beginHorizontalDrag(event, (delta, alt) => { const targetEnd = snap(starts[index] + scene.duration + delta, alt); actions.resizeScene(scene.id, targetEnd - starts[index]) })} />
           </div>)}
           {project.scenes.slice(0, -1).map((scene, index) => { const transition = project.transitions.find((item) => item.fromSceneId === scene.id); const types: TransitionType[] = ['none', 'fade', 'slide', 'wipe']; const current = transition?.type ?? 'none'; return <button key={`transition-${scene.id}`} data-testid="transition-marker" title={`Transition: ${current}`} className="absolute -top-4 z-30 h-8 min-w-8 -translate-x-1/2 rounded-full border border-violet-400 bg-white px-1 text-[10px] uppercase shadow" style={{ left: HEADER_WIDTH + timeToPx(starts[index] + scene.duration, pxPerSecond) }} onClick={(event) => { event.stopPropagation(); actions.setTransition(scene.id, types[(types.indexOf(current) + 1) % types.length]) }}>{current === 'none' ? '+' : current}</button> })}

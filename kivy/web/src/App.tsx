@@ -1,116 +1,69 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Timeline } from './components/Timeline'
+import { AssetThumbnail } from './components/AssetThumbnail'
 import { assetRegistry } from './engine/assetRegistry'
 import { audioRegistry } from './engine/audioRegistry'
 import { blobRegistry } from './engine/blobRegistry'
 import { decodeAudio } from './engine/audioProcessor'
 import { PlaybackEngine } from './engine/playbackEngine'
-import { exportProject, importProject, restoreProject, saveProject } from './engine/persistence'
-import { exportMp4 } from './engine/exportVideo'
 import { renderFrame } from './engine/renderer'
 import { processSketch } from './engine/sketchProcessor'
 import { projectDuration, sceneStarts } from './engine/timeline'
 import type { Asset } from './engine/types'
 import { useProjectStore } from './store/projectStore'
-import { Timeline } from './components/Timeline'
+
+const IconButton = ({ label, icon, active = false, onClick }: { label: string; icon: string; active?: boolean; onClick?: () => void }) => <button title={label} aria-label={label} onClick={onClick} className={`flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[10px] ${active ? 'bg-white text-violet-700' : 'text-slate-600 hover:bg-slate-100'}`}><span className="text-xl leading-none">{icon}</span>{label}</button>
 
 export function App() {
-  const project = useProjectStore((state) => state.project)
-  const addImageScene = useProjectStore((state) => state.addImageScene)
-  const addAudioTrack = useProjectStore((state) => state.addAudioTrack)
-  const replaceProject = useProjectStore((state) => state.replaceProject)
-  const setProjectName = useProjectStore((state) => state.setProjectName)
-  const undo = useProjectStore((state) => state.undo)
-  const redo = useProjectStore((state) => state.redo)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const playbackRef = useRef(new PlaybackEngine())
-  const animationRef = useRef<number | null>(null)
-  const initializedRef = useRef(false)
-  const exportAbortRef = useRef<AbortController | null>(null)
-  const [time, setTime] = useState(0)
-  const [processing, setProcessing] = useState<number | null>(null)
-  const [error, setError] = useState('')
-  const [audioProcessing, setAudioProcessing] = useState(false)
-  const [playing, setPlaying] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'Loading' | 'Saving' | 'Saved' | 'Error'>('Loading')
-  const [ready, setReady] = useState(false)
-  const [exportHeight, setExportHeight] = useState<720 | 1080>(720)
-  const [exportProgress, setExportProgress] = useState<number | null>(null)
-  const [loop, setLoop] = useState(false)
-  const [masterMuted, setMasterMuted] = useState(false)
+  const project = useProjectStore((s) => s.project)
+  const addImageScene = useProjectStore((s) => s.addImageScene), addAudioTrack = useProjectStore((s) => s.addAudioTrack)
+  const replaceProject = useProjectStore((s) => s.replaceProject), setProjectName = useProjectStore((s) => s.setProjectName)
+  const undo = useProjectStore((s) => s.undo), redo = useProjectStore((s) => s.redo)
+  const canvasRef = useRef<HTMLCanvasElement>(null), playbackRef = useRef(new PlaybackEngine()), animationRef = useRef<number | null>(null)
+  const initializedRef = useRef(false), exportAbortRef = useRef<AbortController | null>(null), timeRef = useRef(0), lastUiUpdateRef = useRef(0)
+  const [time, setTimeState] = useState(0), [processing, setProcessing] = useState<number | null>(null), [error, setError] = useState('')
+  const [audioProcessing, setAudioProcessing] = useState(false), [playing, setPlaying] = useState(false), [saveStatus, setSaveStatus] = useState<'Loading'|'Saving'|'Saved'|'Error'>('Loading')
+  const [ready, setReady] = useState(false), [exportHeight, setExportHeight] = useState<720|1080>(720), [exportProgress, setExportProgress] = useState<number | null>(null)
+  const [loop, setLoop] = useState(false), [masterMuted, setMasterMuted] = useState(false), [timelineHeight, setTimelineHeight] = useState(248)
   const duration = projectDuration(project)
+  const paint = useCallback((at = timeRef.current) => { const ctx = canvasRef.current?.getContext('2d'); if (ctx) renderFrame(ctx, project, assetRegistry.snapshot(), at) }, [project])
+  const publishTime = (value: number) => { timeRef.current = Math.max(0, Math.min(duration, value)); setTimeState(timeRef.current) }
 
-  const draw = useCallback(() => {
-    const context = canvasRef.current?.getContext('2d')
-    if (context) renderFrame(context, project, assetRegistry.snapshot(), time)
-  }, [project, time])
-  useEffect(() => { draw() }, [draw])
+  useEffect(() => paint(), [paint])
   useEffect(() => () => { if (animationRef.current !== null) cancelAnimationFrame(animationRef.current); playbackRef.current.dispose() }, [])
-  useEffect(() => { if (initializedRef.current) return; initializedRef.current = true; void restoreProject(playbackRef.current.audioContext).then((saved) => { if (saved) replaceProject(saved); setSaveStatus('Saved'); setReady(true) }).catch((reason) => { setError(reason instanceof Error ? reason.message : 'Unable to restore project'); setSaveStatus('Error'); setReady(true) }) }, [replaceProject])
-  useEffect(() => { if (!ready) return; setSaveStatus('Saving'); const timer = window.setTimeout(() => { void saveProject(project).then(() => setSaveStatus('Saved')).catch((reason) => { setError(reason instanceof Error ? reason.message : 'Autosave failed'); setSaveStatus('Error') }) }, 400); return () => clearTimeout(timer) }, [project, ready])
+  useEffect(() => { if (initializedRef.current) return; initializedRef.current = true; void import('./engine/persistence').then(({ restoreProject }) => restoreProject(playbackRef.current.audioContext)).then((saved) => { if (saved) replaceProject(saved); setSaveStatus('Saved'); setReady(true) }).catch((reason) => { setError(reason instanceof Error ? reason.message : 'Unable to restore project'); setSaveStatus('Error'); setReady(true) }) }, [replaceProject])
+  useEffect(() => { if (!ready) return; setSaveStatus('Saving'); const timer = window.setTimeout(() => { void import('./engine/persistence').then(({ saveProject }) => saveProject(project)).then(() => setSaveStatus('Saved')).catch((reason) => { setError(reason instanceof Error ? reason.message : 'Autosave failed'); setSaveStatus('Error') }) }, 500); return () => clearTimeout(timer) }, [project, ready])
 
-  async function importImage(file?: File) {
-    if (!file) return
-    setError(''); setProcessing(0)
-    try {
-      const result = await processSketch(file, 0.5, setProcessing)
-      const id = crypto.randomUUID(); blobRegistry.set(id, file)
-      const asset: Asset = { id, kind: 'image', blobKey: id, name: file.name, meta: { width: result.image.width, height: result.image.height }, sketchData: result.sketchData }
-      assetRegistry.set(id, result); addImageScene(asset); setTime(sceneStarts([...project.scenes, { id: 'pending', assetId: id, duration: 4, progressStart: 0, progressEnd: 1, sketchSettings: { style: 'pencil', detail: 0.5, lineWidth: 2, fillMode: 'fade', showHand: true } }]).at(-1) ?? 0)
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to process image') } finally { setProcessing(null) }
-  }
+  async function importImage(file?: File) { if (!file) return; setError(''); setProcessing(0); try { const result = await processSketch(file, .5, setProcessing); const id = crypto.randomUUID(); blobRegistry.set(id, file); const asset: Asset = { id, kind:'image', blobKey:id, name:file.name, meta:{ width:result.image.width, height:result.image.height }, sketchData:result.sketchData }; assetRegistry.set(id, result); addImageScene(asset); publishTime(sceneStarts([...project.scenes, { id:'pending', assetId:id, duration:4, progressStart:0, progressEnd:1, sketchSettings:{ style:'pencil', detail:.5, lineWidth:2, fillMode:'fade', showHand:true } }]).at(-1) ?? 0) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to process image') } finally { setProcessing(null) } }
+  async function importAudio(file?: File) { if (!file) return; setError(''); setAudioProcessing(true); try { const { buffer, waveform } = await decodeAudio(file, playbackRef.current.audioContext); const id = crypto.randomUUID(); audioRegistry.set(id, buffer); blobRegistry.set(id, file); addAudioTrack({ id, kind:'audio', blobKey:id, name:file.name, meta:{ duration:buffer.duration, sampleRate:buffer.sampleRate }, waveform }) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to decode audio') } finally { setAudioProcessing(false) } }
+  function animatePlayback(now: number) { const next = playbackRef.current.currentTime; timeRef.current = next; paint(next); if (now - lastUiUpdateRef.current > 100) { setTimeState(next); lastUiUpdateRef.current = now } if (next >= duration) { if (loop) { publishTime(0); void playbackRef.current.play(project, 0).then(() => { animationRef.current = requestAnimationFrame(animatePlayback) }); return } playbackRef.current.pause(); setPlaying(false); publishTime(duration); return } animationRef.current = requestAnimationFrame(animatePlayback) }
+  async function togglePlayback() { if (playing) { publishTime(playbackRef.current.pause()); setPlaying(false); if (animationRef.current !== null) cancelAnimationFrame(animationRef.current); return } const start = timeRef.current >= duration ? 0 : timeRef.current; await playbackRef.current.play(project, start); setPlaying(true); animationRef.current = requestAnimationFrame(animatePlayback) }
+  async function seek(value: number) { publishTime(value); paint(value); await playbackRef.current.seek(project, value) }
+  async function downloadProject() { try { const { exportProject } = await import('./engine/persistence'); const blob = await exportProject(project), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href=url; a.download=`${project.name.replace(/[^a-z0-9_-]+/gi,'_')}.sketchproj`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Project download failed') } }
+  async function openProject(file?: File) { if (!file) return; try { const { importProject } = await import('./engine/persistence'); replaceProject(await importProject(file, playbackRef.current.audioContext)); publishTime(0); setSaveStatus('Saved') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Project open failed') } }
+  async function exportVideo() { setError(''); const controller = new AbortController(); exportAbortRef.current=controller; setExportProgress(0); try { const { exportMp4 } = await import('./engine/exportVideo'); const blob = await exportMp4(structuredClone(project), { height:exportHeight, signal:controller.signal, onProgress:({ progress }) => setExportProgress(progress) }); const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=`${project.name.replace(/[^a-z0-9_-]+/gi,'_')}.mp4`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch (reason) { if (!(reason instanceof DOMException && reason.name==='AbortError')) setError(reason instanceof Error ? reason.message : 'Video export failed') } finally { exportAbortRef.current=null; setExportProgress(null) } }
+  useEffect(() => { const key=(e:KeyboardEvent) => { if ((e.target as HTMLElement)?.matches('input,textarea,select')) return; if(e.code==='Space'){e.preventDefault(); void togglePlayback()} }; addEventListener('keydown',key); return()=>removeEventListener('keydown',key) })
+  const timecode=(v:number)=>`${Math.floor(v/60).toString().padStart(2,'0')}:${Math.floor(v%60).toString().padStart(2,'0')}.${Math.floor(v%1*project.fps).toString().padStart(2,'0')}`
+  const beginTimelineResize=(e:React.PointerEvent)=>{ const startY=e.clientY,startH=timelineHeight; const move=(m:PointerEvent)=>setTimelineHeight(Math.max(150,Math.min(460,startH+startY-m.clientY))); const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up)}; addEventListener('pointermove',move);addEventListener('pointerup',up,{once:true}) }
 
-  async function importAudio(file?: File) {
-    if (!file) return
-    setError(''); setAudioProcessing(true)
-    try {
-      const { buffer, waveform } = await decodeAudio(file, playbackRef.current.audioContext)
-      const id = crypto.randomUUID(); audioRegistry.set(id, buffer); blobRegistry.set(id, file)
-      addAudioTrack({ id, kind: 'audio', blobKey: id, name: file.name, meta: { duration: buffer.duration, sampleRate: buffer.sampleRate }, waveform })
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to decode audio') } finally { setAudioProcessing(false) }
-  }
-
-  function animatePlayback() {
-    const next = playbackRef.current.currentTime
-    if (next >= duration) { if (loop) { setTime(0); void playbackRef.current.play(project, 0).then(() => { animationRef.current = requestAnimationFrame(animatePlayback) }); return } playbackRef.current.pause(); setPlaying(false); setTime(duration); return }
-    setTime(next); animationRef.current = requestAnimationFrame(animatePlayback)
-  }
-  async function togglePlayback() {
-    if (playing) { setTime(playbackRef.current.pause()); setPlaying(false); if (animationRef.current !== null) cancelAnimationFrame(animationRef.current); return }
-    await playbackRef.current.play(project, time >= duration ? 0 : time); setPlaying(true); animationRef.current = requestAnimationFrame(animatePlayback)
-  }
-  async function seek(value: number) { setTime(value); await playbackRef.current.seek(project, value) }
-  async function downloadProject() { try { const blob = await exportProject(project); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${project.name.replace(/[^a-z0-9_-]+/gi, '_')}.sketchproj`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Project download failed') } }
-  async function openProject(file?: File) { if (!file) return; try { replaceProject(await importProject(file, playbackRef.current.audioContext)); setTime(0); setSaveStatus('Saved') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Project open failed') } }
-  async function exportVideo() { setError(''); const controller = new AbortController(); exportAbortRef.current = controller; setExportProgress(0); try { const blob = await exportMp4(structuredClone(project), { height: exportHeight, signal: controller.signal, onProgress: ({ progress }) => setExportProgress(progress) }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${project.name.replace(/[^a-z0-9_-]+/gi, '_')}.mp4`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch (reason) { if (!(reason instanceof DOMException && reason.name === 'AbortError')) setError(reason instanceof Error ? reason.message : 'Video export failed') } finally { exportAbortRef.current = null; setExportProgress(null) } }
-
-  useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.target as HTMLElement)?.matches('input, textarea, select')) return; if (event.code === 'Space') { event.preventDefault(); void togglePlayback() } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) })
-  const timecode = (value: number) => `${Math.floor(value / 60).toString().padStart(2, '0')}:${Math.floor(value % 60).toString().padStart(2, '0')}.${Math.floor(value % 1 * project.fps).toString().padStart(2, '0')}`
-
-  return <><div className="p-8 text-center text-gray-700 min-[1280px]:hidden"><h1 className="text-xl font-semibold">Use a larger screen</h1><p className="mt-2">Sketch Video Studio requires a window at least 1280px wide.</p></div><main className="min-h-screen p-6 max-[1279px]:hidden">
-    <header className="mx-auto flex max-w-6xl items-center justify-between rounded-xl bg-white p-4 shadow-sm">
-      <div><input aria-label="Project name" className="text-xl font-semibold outline-none focus:ring-2 focus:ring-violet-300" value={project.name} onChange={(event) => setProjectName(event.target.value)} /><p className="text-sm text-gray-500">Sketch Video Studio · {duration.toFixed(2)} seconds · <span data-testid="save-status">{saveStatus}</span></p></div>
-      <div className="flex gap-2"><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={undo}>Undo</button><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={redo}>Redo</button><button className="rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200" onClick={() => void downloadProject()}>Download project</button><label className="cursor-pointer rounded-lg bg-gray-100 px-3 py-2 hover:bg-gray-200">Open project<input data-testid="project-input" className="hidden" type="file" accept=".sketchproj" onChange={(event) => void openProject(event.target.files?.[0])} /></label><select aria-label="Export resolution" value={exportHeight} onChange={(event) => setExportHeight(Number(event.target.value) as 720 | 1080)} className="rounded-lg bg-gray-100 px-2"><option value="720">720p</option><option value="1080">1080p</option></select><button className="rounded-lg bg-violet-600 px-4 py-2 font-medium text-white" onClick={() => void exportVideo()}>Export MP4</button></div>
+  return <main className="flex h-screen min-w-[1000px] flex-col overflow-hidden bg-[#f3f4f6] text-slate-800">
+    <header className="flex h-14 shrink-0 items-center gap-3 bg-gradient-to-r from-[#121338] via-[#5d2d91] to-[#7c3aed] px-4 text-white shadow-sm">
+      <div className="mr-2 text-lg font-bold">Sketch Studio</div><button className="rounded px-2 py-1 hover:bg-white/15">File</button><button aria-label="Undo" className="rounded px-2 py-1 hover:bg-white/15" onClick={undo}>↶</button><button aria-label="Redo" className="rounded px-2 py-1 hover:bg-white/15" onClick={redo}>↷</button>
+      <input aria-label="Project name" className="mx-auto w-72 rounded-md bg-white/10 px-3 py-1.5 text-center outline-none focus:bg-white/20" value={project.name} onChange={(e)=>setProjectName(e.target.value)} />
+      <span data-testid="save-status" className="text-xs text-white/75">{saveStatus}</span><label className="cursor-pointer rounded-md px-2 py-2 text-sm hover:bg-white/15">Open<input data-testid="project-input" className="hidden" type="file" accept=".sketchproj" onChange={(e)=>void openProject(e.target.files?.[0])}/></label><button className="rounded-md px-2 py-2 text-sm hover:bg-white/15" onClick={()=>void downloadProject()}>Download project</button>
+      <select aria-label="Export resolution" value={exportHeight} onChange={(e)=>setExportHeight(Number(e.target.value) as 720|1080)} className="rounded-md bg-white/15 px-2 py-2 text-sm"><option className="text-black" value="720">720p</option><option className="text-black" value="1080">1080p</option></select><button className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow" onClick={()=>void exportVideo()}>Export MP4</button>
     </header>
-    <section className="mx-auto mt-5 max-w-6xl rounded-xl bg-white p-5 shadow-sm">
-      <div className="mx-auto aspect-video max-h-[62vh] overflow-hidden rounded-lg bg-white ring-1 ring-gray-200">
-        <canvas ref={canvasRef} data-testid="preview-canvas" width={1920} height={1080} className="h-full w-full object-contain" />
+    <div className="flex min-h-0 flex-1">
+      <nav className="w-18 shrink-0 border-r bg-[#f8f8fa]"><IconButton label="Design" icon="◫"/><IconButton label="Uploads" icon="☁" active/><IconButton label="Text" icon="T"/><IconButton label="Elements" icon="◇"/><IconButton label="Audio" icon="♫"/></nav>
+      <aside className="flex w-72 shrink-0 flex-col border-r bg-white p-4"><h2 className="text-lg font-semibold">Uploads</h2><p className="mb-3 text-xs text-slate-500">Images become animated sketch scenes.</p><label className="cursor-pointer rounded-lg bg-violet-600 px-4 py-2.5 text-center text-sm font-semibold text-white">Upload image<input data-testid="image-input" className="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e)=>void importImage(e.target.files?.[0])}/></label><label className="mt-2 cursor-pointer rounded-lg border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700">{audioProcessing?'Decoding…':'Add audio'}<input data-testid="audio-input" className="hidden" type="file" accept="audio/*" disabled={audioProcessing} onChange={(e)=>void importAudio(e.target.files?.[0])}/></label><div className="mt-4 grid grid-cols-2 gap-2 overflow-y-auto">{project.scenes.map((s)=><div key={s.id} className="aspect-video overflow-hidden rounded-md border"><AssetThumbnail assetId={s.assetId}/></div>)}</div>
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-11 shrink-0 items-center gap-2 border-b bg-white px-4 text-sm"><button className="rounded px-2 py-1 hover:bg-slate-100">Edit sketch</button><button className="rounded px-2 py-1 hover:bg-slate-100">Animate</button><button className="rounded px-2 py-1 hover:bg-slate-100">Position</button><span className="h-5 border-l"/><span className="text-slate-500">Pencil · Fade fill · Hand on</span></div>
+        <section className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#edf0f4] p-5"><div className="aspect-video h-full max-h-full max-w-full overflow-hidden bg-white shadow-xl ring-1 ring-black/5"><canvas ref={canvasRef} data-testid="preview-canvas" width={960} height={540} className="h-full w-full"/></div>{processing!==null&&<div role="status" className="absolute bottom-3 rounded-full bg-black/75 px-4 py-2 text-xs text-white">Tracing sketch… {Math.round(processing*100)}%</div>}{error&&<p role="alert" className="absolute right-4 top-4 max-w-md rounded bg-red-50 p-3 text-sm text-red-700 shadow">{error}</p>}</section>
+        <div className="flex h-12 shrink-0 items-center justify-center gap-3 border-y bg-white px-4"><button aria-label="Skip to start" onClick={()=>void seek(0)}>◀│</button><button aria-label={playing?'Pause':'Play'} className="grid h-8 w-8 place-items-center rounded-full bg-slate-900 text-white" onClick={()=>void togglePlayback()}>{playing?'Ⅱ':'▶'}</button><button aria-label="Skip to end" onClick={()=>void seek(duration)}>│▶</button><output data-testid="scheduled-audio" className="sr-only">{playing?playbackRef.current.scheduledCount:0}</output><input aria-label="Scrub sketch" className="w-56 accent-violet-600" type="range" min="0" max={Math.max(duration,.01)} step={1/project.fps} value={Math.min(time,duration)} onChange={(e)=>void seek(Number(e.target.value))}/><output className="w-32 font-mono text-xs">{timecode(time)} / {timecode(duration)}</output><label className="text-xs"><input type="checkbox" checked={loop} onChange={(e)=>setLoop(e.target.checked)}/> Loop</label><button aria-label="Master mute" aria-pressed={masterMuted} onClick={()=>{const m=!masterMuted;setMasterMuted(m);playbackRef.current.setMasterMuted(m)}}>{masterMuted?'🔇':'🔊'}</button></div>
+        <div onPointerDown={beginTimelineResize} className="h-1.5 shrink-0 cursor-row-resize border-y bg-slate-200 hover:bg-violet-300"/><div className="shrink-0" style={{height:timelineHeight}}><Timeline playhead={time} onSeek={(v)=>void seek(v)}/></div>
       </div>
-      <div className="mt-4 flex items-center gap-4">
-        <button aria-label="Skip to start" className="rounded-lg bg-gray-100 px-3 py-2" onClick={() => void seek(0)}>⏮</button>
-        <button className="w-20 rounded-lg bg-gray-900 px-3 py-2 text-white" onClick={() => void togglePlayback()}>{playing ? 'Pause' : 'Play'}</button>
-        <button aria-label="Skip to end" className="rounded-lg bg-gray-100 px-3 py-2" onClick={() => void seek(duration)}>⏭</button>
-        <output data-testid="scheduled-audio" className="sr-only">{playing ? playbackRef.current.scheduledCount : 0}</output>
-        <label className="cursor-pointer rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-700">Upload image<input data-testid="image-input" className="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(event) => void importImage(event.target.files?.[0])} /></label>
-        <input aria-label="Scrub sketch" className="min-w-0 flex-1 accent-violet-600" type="range" min="0" max={Math.max(duration, 0.01)} step={1 / project.fps} value={Math.min(time, duration)} onChange={(event) => void seek(Number(event.target.value))} />
-        <output className="w-36 text-right font-mono text-sm">{timecode(time)} / {timecode(duration)}</output>
-        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={loop} onChange={(event) => setLoop(event.target.checked)} /> Loop</label>
-        <button aria-label="Master mute" aria-pressed={masterMuted} className="rounded-lg bg-gray-100 px-3 py-2" onClick={() => { const muted = !masterMuted; setMasterMuted(muted); playbackRef.current.setMasterMuted(muted) }}>{masterMuted ? '🔇' : '🔊'}</button>
-      </div>
-      {processing !== null && <div className="mt-3" role="status"><div className="mb-1 text-sm">Tracing sketch… {Math.round(processing * 100)}%</div><div className="h-2 rounded bg-gray-200"><div className="h-2 rounded bg-violet-600" style={{ width: `${processing * 100}%` }} /></div></div>}
-      {error && <p role="alert" className="mt-3 rounded bg-red-50 p-3 text-red-700">{error}</p>}
-      {exportProgress !== null && <div data-testid="export-progress" className="mt-3 rounded bg-violet-50 p-3"><div className="flex justify-between text-sm"><span>Exporting video… {Math.round(exportProgress * 100)}%</span><button onClick={() => exportAbortRef.current?.abort()}>Cancel</button></div><progress className="w-full" max="1" value={exportProgress} /></div>}
-    </section>
-    <div className="mx-auto mt-4 flex max-w-6xl justify-end"><label className="cursor-pointer rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white">{audioProcessing ? 'Decoding…' : '+ Add audio'}<input data-testid="audio-input" className="hidden" type="file" accept="audio/*" disabled={audioProcessing} onChange={(event) => void importAudio(event.target.files?.[0])} /></label></div>
-    <Timeline playhead={time} onSeek={(value) => void seek(value)} />
-  </main></>
+    </div>
+    {exportProgress!==null&&<div data-testid="export-progress" className="fixed inset-x-0 bottom-0 z-50 bg-violet-50 p-3 shadow"><div className="flex justify-between text-sm"><span>Exporting video… {Math.round(exportProgress*100)}%</span><button onClick={()=>exportAbortRef.current?.abort()}>Cancel</button></div><progress className="w-full" max="1" value={exportProgress}/></div>}
+  </main>
 }

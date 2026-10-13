@@ -18,7 +18,9 @@ interface ProjectState {
 
 const clone = (project: Project): Project => structuredClone(project)
 export const useProjectStore = create<ProjectState>((set) => {
-  const commit = (mutate: (draft: Project) => void) => set((state) => ({ project: produce(state.project, mutate), past: [...state.past, clone(state.project)], future: [] }))
+  // Immer projects are immutable snapshots. Keeping those references makes undo O(1)
+  // and avoids cloning image traces and waveform arrays on every timeline gesture.
+  const commit = (mutate: (draft: Project) => void) => set((state) => ({ project: produce(state.project, mutate), past: [...state.past, state.project], future: [] }))
   return {
     project: createEmptyProject(), past: [], future: [],
     addImageScene: (asset) => commit((project) => {
@@ -53,8 +55,8 @@ export const useProjectStore = create<ProjectState>((set) => {
     setProjectName: (name) => commit((project) => { project.name = name.trim() || 'Untitled project' }),
     setClipMuted: (id, muted) => commit((project) => { for (const track of project.audioTracks) { const clip = track.clips.find((item) => item.id === id); if (clip) { clip.muted = muted; return } } }),
     setClipVolume: (id, volume) => commit((project) => { for (const track of project.audioTracks) { const clip = track.clips.find((item) => item.id === id); if (clip) { clip.volume = Math.max(0, Math.min(2, volume)); return } } }),
-    undo: () => set((state) => state.past.length ? { project: clone(state.past.at(-1)!), past: state.past.slice(0, -1), future: [clone(state.project), ...state.future] } : state),
-    redo: () => set((state) => state.future.length ? { project: clone(state.future[0]), past: [...state.past, clone(state.project)], future: state.future.slice(1) } : state),
+    undo: () => set((state) => state.past.length ? { project: state.past.at(-1)!, past: state.past.slice(0, -1), future: [state.project, ...state.future] } : state),
+    redo: () => set((state) => state.future.length ? { project: state.future[0], past: [...state.past, state.project], future: state.future.slice(1) } : state),
   }
 })
 
