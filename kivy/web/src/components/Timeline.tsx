@@ -41,6 +41,8 @@ export function Timeline({ playhead, onSeek }: Props) {
   }
   const tickStep = pxPerSecond >= 160 ? 0.5 : pxPerSecond >= 60 ? 1 : pxPerSecond >= 25 ? 5 : 10
   const ticks = Array.from({ length: Math.ceil(duration / tickStep) + 1 }, (_, index) => index * tickStep)
+  useEffect(() => { const viewport = scrollRef.current; if (!viewport) return; const x = HEADER_WIDTH + timeToPx(playhead, pxPerSecond); if (x > viewport.scrollLeft + viewport.clientWidth - 80) viewport.scrollTo({ left: x - viewport.clientWidth + 120, behavior: 'smooth' }) }, [playhead, pxPerSecond])
+  const selectedClip = selection?.kind === 'clip' ? project.audioTracks.flatMap((track) => track.clips).find((clip) => clip.id === selection.id) : undefined
 
   return <section className="mx-auto mt-4 max-w-6xl overflow-hidden rounded-xl bg-[#e7e9ee] shadow-sm" data-testid="timeline">
     <div className="flex items-center justify-between border-b border-gray-300 bg-white px-4 py-2">
@@ -48,6 +50,7 @@ export function Timeline({ playhead, onSeek }: Props) {
         <button onClick={() => { if (selection) selection.kind === 'scene' ? actions.splitScene(selection.id, playhead) : actions.splitClip(selection.id, playhead) }} className="rounded bg-gray-100 px-3 py-1 text-sm">Split</button>
         <button onClick={() => selection?.kind === 'scene' && actions.duplicateScene(selection.id)} className="rounded bg-gray-100 px-3 py-1 text-sm">Duplicate</button>
         <button onClick={() => { if (selection) selection.kind === 'scene' ? actions.deleteScene(selection.id) : actions.deleteClip(selection.id) }} className="rounded bg-gray-100 px-3 py-1 text-sm">Delete</button>
+        {selectedClip && <><button aria-label="Mute selected clip" aria-pressed={selectedClip.muted} onClick={() => actions.setClipMuted(selectedClip.id, !selectedClip.muted)} className="rounded bg-gray-100 px-3 py-1 text-sm">{selectedClip.muted ? 'Unmute clip' : 'Mute clip'}</button><label className="flex items-center gap-1 text-xs">Clip volume<input aria-label="Selected clip volume" type="range" min="0" max="2" step="0.05" value={selectedClip.volume} onChange={(event) => actions.setClipVolume(selectedClip.id, Number(event.target.value))} /></label></>}
       </div>
       <label className="flex items-center gap-2 text-sm">Zoom <input aria-label="Timeline zoom" type="range" min="10" max="400" value={pxPerSecond} onChange={(event) => setPxPerSecond(Number(event.target.value))} /></label>
     </div>

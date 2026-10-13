@@ -37,6 +37,7 @@ export class PlaybackEngine {
   async seek(project: Project, time: number): Promise<void> { const wasPlaying = this.playing; this.startPosition = Math.max(0, Math.min(time, projectDuration(project))); if (wasPlaying) await this.play(project, this.startPosition) }
   setTrack(trackId: string, muted: boolean, volume: number): void { const gain = this.trackGains.get(trackId); if (gain && this.context) gain.gain.setValueAtTime(muted ? 0 : volume, this.context.currentTime) }
   setClip(clipId: string, muted: boolean, volume: number): void { for (const item of this.scheduled) if (item.clipId === clipId && this.context) item.clipGain.gain.setValueAtTime(muted ? 0 : volume, this.context.currentTime) }
+  setMasterMuted(muted: boolean): void { if (this.master && this.context) this.master.gain.setValueAtTime(muted ? 0 : 1, this.context.currentTime) }
   dispose(): void { this.pause(); void this.context?.close(); this.context = undefined }
   private stopNodes(): void { for (const item of this.scheduled) { try { item.source.stop() } catch { /* already stopped */ } item.source.disconnect(); item.clipGain.disconnect() } this.scheduled = []; for (const gain of this.trackGains.values()) gain.disconnect(); this.trackGains.clear(); this.master?.disconnect(); this.master = undefined }
 }

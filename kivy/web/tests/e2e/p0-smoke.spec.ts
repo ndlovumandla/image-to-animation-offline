@@ -8,7 +8,7 @@ test('P0 harness loads in a real browser without runtime errors', async ({ page 
 
   await page.goto('/')
   await expect(page).toHaveTitle('Sketch Video Studio')
-  await expect(page.getByRole('heading', { name: 'Untitled project' })).toBeVisible()
+  await expect(page.getByLabel('Project name')).toHaveValue('Untitled project')
   await expect(page.getByTestId('timeline')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Redo' })).toBeVisible()

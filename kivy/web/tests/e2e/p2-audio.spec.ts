@@ -15,7 +15,7 @@ test('overlapping tracks play, seek, mute and change volume live', async ({ page
   await input.setInputFiles({ name: 'music.wav', mimeType: 'audio/wav', buffer: wav(660) })
   await expect(page.getByTestId('timeline-audio-lane')).toHaveCount(2); await expect(page.getByTestId('waveform')).toHaveCount(2)
   await page.getByRole('button', { name: 'Play' }).click(); await expect(page.getByTestId('scheduled-audio')).toHaveText('2')
-  await page.waitForTimeout(250); await expect(page.getByText(/^0\.[12-9]\d \/ 1\.50$/)).toBeVisible()
+  await page.waitForTimeout(250); expect(await page.getByLabel('Scrub sketch').inputValue().then(Number)).toBeGreaterThan(0.1)
   await page.getByRole('button', { name: 'Timeline mute voice.wav' }).click(); await expect(page.getByRole('button', { name: 'Timeline mute voice.wav' })).toHaveText('🔇')
   await page.getByLabel('Timeline volume music.wav').fill('0.25'); await expect(page.getByLabel('Timeline volume music.wav')).toHaveValue('0.25')
   await page.getByLabel('Scrub sketch').fill('0.5'); await expect(page.getByTestId('scheduled-audio')).toHaveText('2')

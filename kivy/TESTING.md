@@ -96,3 +96,13 @@ P0 covers derived scene starts, duration ripple, minimum scene duration, continu
 | Regression/build | PASS | 14/14 Vitest tests, 8/8 Playwright tests, strict build, 0 audit vulnerabilities. |
 
 `mp4-muxer` emits a deprecation notice in favor of Mediabunny, but remains here because the fixed product specification explicitly requires `mp4-muxer`.
+
+## Browser P7 — Polish and stress
+
+| Check | Result | Evidence |
+|---|---|---|
+| Large project timeline | PASS | Edge renders and manipulates 60 scenes, four tracks, and 10-minute extents. |
+| Timing/waveform stress | PASS | 1,000 timeline calculations plus multiresolution peaks complete below the 1s budget. |
+| Transport and accessibility | PASS | Skip, timecode, loop, master mute, editable name, labels, and selected-clip controls are present. |
+| Responsive guard | PASS | Windows below 1280px show a larger-screen notice. |
+| Final regression | PASS | 15/15 Vitest tests, 9/9 Playwright tests, strict build, 0 audit vulnerabilities. |

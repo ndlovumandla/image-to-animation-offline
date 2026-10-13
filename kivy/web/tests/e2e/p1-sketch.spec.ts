@@ -16,7 +16,7 @@ test('uploads, traces, and deterministically scrubs a real image', async ({ page
   const canvas = page.getByTestId('preview-canvas')
   const start = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL())
   await page.getByLabel('Scrub sketch').fill('2')
-  await expect(page.getByText(/^2\.00 \/ 4\.00$/)).toBeVisible()
+  await expect(page.getByText(/^00:02\.00 \/ 00:04\.00$/)).toBeVisible()
   const middleA = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL())
   await page.getByLabel('Scrub sketch').fill('1')
   await page.getByLabel('Scrub sketch').fill('2')
