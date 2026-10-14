@@ -22,6 +22,11 @@ the local model cache. Images stay on the computer. If the service is not
 running, the editor falls back to edge-connected color removal, which is useful
 for whiteboard art and solid backgrounds but is not an AI segmentation model.
 
+The same service powers the painted Magic Eraser. Paint over an unwanted object,
+adjust the brush size, then choose **Remove painted**. The local inpainting route
+reconstructs the selected region from surrounding pixels. Without the service,
+the editor falls back to transparent removal and tells the user that it did so.
+
 ## Open content providers
 
 - Iconify supplies searchable SVG graphics. Icon collections have their own
