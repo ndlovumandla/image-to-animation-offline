@@ -25,9 +25,9 @@ function drawPartialStroke(context: CanvasRenderingContext2D | OffscreenCanvasRe
   context.stroke();return tip
 }
 
-function drawHand(context:CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D,x:number,y:number,style:'classic'|'left'|'marker'){
+function drawHand(context:CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D,x:number,y:number,style:'classic'|'left'|'marker',imageHeight:number){
   const artwork=getHand(style)
-  if(artwork){context.save();context.translate(x,y);if(style==='left')context.scale(-1,1);if(style==='marker')context.filter='sepia(.4) saturate(.75) brightness(.8)';const scale=150/artwork.height;context.drawImage(artwork,-20,-22,artwork.width*scale,artwork.height*scale);context.restore();return}
+  if(artwork){context.save();context.translate(x,y);if(style==='marker')context.filter='sepia(.4) saturate(.75) brightness(.8)';const height=Math.max(60,Math.min(imageHeight*.56,330)),width=artwork.width/artwork.height*height;if(style==='left'){context.scale(-1,1);context.drawImage(artwork,-width,0,width,height)}else context.drawImage(artwork,0,0,width,height);context.restore();return}
   context.save();context.translate(x,y);if(style==='left')context.scale(-1,1);context.rotate(-.55)
   context.fillStyle=style==='marker'?'#82502f':'#e7b985';context.strokeStyle='#5b3727';context.lineWidth=2
   context.beginPath();context.roundRect(14,8,70,38,16);context.fill();context.stroke()
@@ -52,7 +52,7 @@ function drawScene(context: CanvasRenderingContext2D | OffscreenCanvasRenderingC
   let remaining = data.totalLength * clamp01(progress / 0.75)
   let tip:{x:number;y:number}|undefined
   for (const stroke of data.strokes) { if (remaining <= 0) break; tip=drawPartialStroke(context, stroke, Math.min(stroke.length, remaining))??tip; remaining -= stroke.length }
-  if(scene.sketchSettings.showHand&&tip&&progress<.76)drawHand(context,tip.x,tip.y,scene.sketchSettings.handStyle??'classic')
+  if(scene.sketchSettings.showHand&&tip&&progress<.76)drawHand(context,tip.x,tip.y,scene.sketchSettings.handStyle??'classic',data.height)
   const fillOpacity = scene.sketchSettings.fillMode === 'none' ? 0 : clamp01((progress - 0.65) / 0.35)
   if (fillOpacity > 0) { context.globalAlpha *= fillOpacity; context.drawImage(asset.image, 0, 0, data.width, data.height) }
   context.restore()
