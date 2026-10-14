@@ -14,6 +14,8 @@ interface ProjectState {
   duplicateScene(id: string): void; deleteScene(id: string): void; deleteClip(id: string): void; splitClip(id: string, time: number): void
   setTransition(fromId: string, type: TransitionType, duration?: number): void
   setProjectName(name: string): void; setClipMuted(id: string, muted: boolean): void; setClipVolume(id: string, volume: number): void
+  setSceneDurationMs(id: string, milliseconds: number): void; setSceneHand(id: string, show: boolean, style: 'classic'|'left'|'marker'): void
+  setProjectBackground(color: string): void; newProject(): void; setAllTransitions(type: TransitionType, duration: number): void
 }
 
 const clone = (project: Project): Project => structuredClone(project)
@@ -55,6 +57,11 @@ export const useProjectStore = create<ProjectState>((set) => {
     setProjectName: (name) => commit((project) => { project.name = name.trim() || 'Untitled project' }),
     setClipMuted: (id, muted) => commit((project) => { for (const track of project.audioTracks) { const clip = track.clips.find((item) => item.id === id); if (clip) { clip.muted = muted; return } } }),
     setClipVolume: (id, volume) => commit((project) => { for (const track of project.audioTracks) { const clip = track.clips.find((item) => item.id === id); if (clip) { clip.volume = Math.max(0, Math.min(2, volume)); return } } }),
+    setSceneDurationMs: (id, milliseconds) => commit((project) => resizeScene(project, id, Math.max(100, milliseconds) / 1000)),
+    setSceneHand: (id, show, style) => commit((project) => { const scene=project.scenes.find(item=>item.id===id);if(scene){scene.sketchSettings.showHand=show;scene.sketchSettings.handStyle=style} }),
+    setProjectBackground: (color) => commit((project) => { project.background=color }),
+    newProject: () => set({ project:createEmptyProject(),past:[],future:[] }),
+    setAllTransitions: (type,duration) => commit((project) => { project.transitions=[];for(let i=0;i<project.scenes.length-1;i++){const from=project.scenes[i],to=project.scenes[i+1];project.transitions.push({id:crypto.randomUUID(),fromSceneId:from.id,toSceneId:to.id,type,duration:type==='none'?0:Math.min(duration,from.duration/2,to.duration/2)})} }),
     undo: () => set((state) => state.past.length ? { project: state.past.at(-1)!, past: state.past.slice(0, -1), future: [state.project, ...state.future] } : state),
     redo: () => set((state) => state.future.length ? { project: state.future[0], past: [...state.past, state.project], future: state.future.slice(1) } : state),
   }

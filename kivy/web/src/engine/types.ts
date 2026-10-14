@@ -1,7 +1,7 @@
 export type Id = string
 export type FillMode = 'fade' | 'brush' | 'none'
 export type SketchStyle = 'pencil' | 'ink' | 'marker'
-export type TransitionType = 'none' | 'fade' | 'slide' | 'wipe'
+export type TransitionType = 'none' | 'fade' | 'dissolve' | 'slide' | 'push' | 'wipe' | 'zoom' | 'blur'
 
 export interface Point { x: number; y: number }
 export interface Stroke { points: Point[]; length: number }
@@ -9,7 +9,7 @@ export interface SketchData { strokes: Stroke[]; totalLength: number; width: num
 export interface WaveformLevel { bucketSize: number; min: number[]; max: number[] }
 
 export interface SketchSettings {
-  style: SketchStyle; detail: number; lineWidth: number; fillMode: FillMode; showHand: boolean
+  style: SketchStyle; detail: number; lineWidth: number; fillMode: FillMode; showHand: boolean; handStyle?: 'classic' | 'left' | 'marker'
 }
 export interface Scene {
   id: Id; assetId: Id; duration: number; progressStart: number; progressEnd: number; sketchSettings: SketchSettings
@@ -28,5 +28,5 @@ export interface Project {
   scenes: Scene[]; transitions: Transition[]; audioTracks: AudioTrack[]; assets: Record<Id, Asset>
 }
 
-export const defaultSketchSettings = (): SketchSettings => ({ style: 'pencil', detail: 0.5, lineWidth: 2, fillMode: 'fade', showHand: true })
+export const defaultSketchSettings = (): SketchSettings => ({ style: 'pencil', detail: 0.5, lineWidth: 2, fillMode: 'fade', showHand: true, handStyle: 'classic' })
 export const createEmptyProject = (): Project => ({ id: crypto.randomUUID(), name: 'Untitled project', fps: 30, width: 1920, height: 1080, background: '#fff', scenes: [], transitions: [], audioTracks: [], assets: {} })

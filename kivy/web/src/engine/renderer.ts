@@ -16,11 +16,20 @@ export function frameState(project: Project, timeSec: number): FrameState {
   return { scene, localTime, progress, drawProgress: clamp01(progress / 0.75), fillOpacity: scene.sketchSettings.fillMode === 'none' ? 0 : clamp01((progress - 0.65) / 0.35) }
 }
 
-function drawPartialStroke(context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stroke: Stroke, length: number): void {
-  if (length <= 0 || stroke.points.length < 2) return
+function drawPartialStroke(context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stroke: Stroke, length: number) {
+  if (length <= 0 || stroke.points.length < 2) return undefined
+  let tip=stroke.points[0]
   context.beginPath(); context.moveTo(stroke.points[0].x, stroke.points[0].y); let remaining = length
-  for (let i = 1; i < stroke.points.length && remaining > 0; i += 1) { const a = stroke.points[i - 1]; const b = stroke.points[i]; const segment = Math.hypot(b.x - a.x, b.y - a.y); if (remaining >= segment) { context.lineTo(b.x, b.y); remaining -= segment } else { const ratio = segment ? remaining / segment : 0; context.lineTo(a.x + (b.x - a.x) * ratio, a.y + (b.y - a.y) * ratio); remaining = 0 } }
-  context.stroke()
+  for (let i = 1; i < stroke.points.length && remaining > 0; i += 1) { const a = stroke.points[i - 1]; const b = stroke.points[i]; const segment = Math.hypot(b.x - a.x, b.y - a.y); if (remaining >= segment) { context.lineTo(b.x, b.y);tip=b; remaining -= segment } else { const ratio = segment ? remaining / segment : 0;tip={x:a.x+(b.x-a.x)*ratio,y:a.y+(b.y-a.y)*ratio}; context.lineTo(tip.x,tip.y); remaining = 0 } }
+  context.stroke();return tip
+}
+
+function drawHand(context:CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D,x:number,y:number,style:'classic'|'left'|'marker'){
+  context.save();context.translate(x,y);if(style==='left')context.scale(-1,1);context.rotate(-.55)
+  context.fillStyle=style==='marker'?'#82502f':'#e7b985';context.strokeStyle='#5b3727';context.lineWidth=2
+  context.beginPath();context.roundRect(14,8,70,38,16);context.fill();context.stroke()
+  context.fillStyle=style==='marker'?'#18181b':'#f4f4f5';context.beginPath();context.roundRect(-46,-5,75,14,6);context.fill();context.stroke()
+  context.fillStyle='#1e3a8a';context.fillRect(-55,-5,14,14);context.restore()
 }
 
 export function transitionState(project: Project, timeSec: number): ActiveTransition | undefined {
@@ -38,7 +47,9 @@ function drawScene(context: CanvasRenderingContext2D | OffscreenCanvasRenderingC
   const data = asset.sketchData; const scale = Math.min(context.canvas.width / data.width, context.canvas.height / data.height); const x = (context.canvas.width - data.width * scale) / 2; const y = (context.canvas.height - data.height * scale) / 2
   context.save(); context.translate(x, y); context.scale(scale, scale); context.lineCap = 'round'; context.lineJoin = 'round'; context.strokeStyle = scene.sketchSettings.style === 'marker' ? '#263238' : '#101114'; context.lineWidth = scene.sketchSettings.lineWidth / scale
   let remaining = data.totalLength * clamp01(progress / 0.75)
-  for (const stroke of data.strokes) { if (remaining <= 0) break; drawPartialStroke(context, stroke, Math.min(stroke.length, remaining)); remaining -= stroke.length }
+  let tip:{x:number;y:number}|undefined
+  for (const stroke of data.strokes) { if (remaining <= 0) break; tip=drawPartialStroke(context, stroke, Math.min(stroke.length, remaining))??tip; remaining -= stroke.length }
+  if(scene.sketchSettings.showHand&&tip&&progress<.76)drawHand(context,tip.x,tip.y,scene.sketchSettings.handStyle??'classic')
   const fillOpacity = scene.sketchSettings.fillMode === 'none' ? 0 : clamp01((progress - 0.65) / 0.35)
   if (fillOpacity > 0) { context.globalAlpha *= fillOpacity; context.drawImage(asset.image, 0, 0, data.width, data.height) }
   context.restore()
@@ -52,9 +63,11 @@ export function renderFrame(context: CanvasRenderingContext2D | OffscreenCanvasR
   const active = transitionState(project, timeSec); const nextAsset = active && assets.get(active.to.assetId)
   if (active && nextAsset) {
     context.save()
-    if (active.transition.type === 'fade') context.globalAlpha = active.progress
-    if (active.transition.type === 'slide') context.translate(context.canvas.width * (1 - active.progress), 0)
+    if (active.transition.type === 'fade' || active.transition.type === 'dissolve') context.globalAlpha = active.transition.type==='dissolve' ? active.progress*active.progress*(3-2*active.progress) : active.progress
+    if (active.transition.type === 'slide' || active.transition.type === 'push') context.translate(context.canvas.width * (1 - active.progress), 0)
     if (active.transition.type === 'wipe') { context.beginPath(); context.rect(0, 0, context.canvas.width * active.progress, context.canvas.height); context.clip() }
+    if(active.transition.type==='zoom'){const scale=.7+.3*active.progress;context.translate(context.canvas.width/2,context.canvas.height/2);context.scale(scale,scale);context.translate(-context.canvas.width/2,-context.canvas.height/2);context.globalAlpha=active.progress}
+    if(active.transition.type==='blur'){context.filter=`blur(${(1-active.progress)*18}px)`;context.globalAlpha=active.progress}
     context.fillStyle = project.background; context.fillRect(0, 0, context.canvas.width, context.canvas.height)
     drawScene(context, active.to, nextAsset, active.to.progressStart)
     context.restore()
