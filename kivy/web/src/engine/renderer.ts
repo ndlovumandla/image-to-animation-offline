@@ -1,6 +1,7 @@
 import { sceneStarts } from './timeline'
 import type { Project, Scene, Stroke, Transition } from './types'
 import type { RenderAsset } from './assetRegistry'
+import { getHand } from './handRegistry'
 
 export interface FrameState { scene?: Scene; localTime: number; progress: number; drawProgress: number; fillOpacity: number }
 export interface ActiveTransition { transition: Transition; from: Scene; to: Scene; progress: number }
@@ -25,6 +26,8 @@ function drawPartialStroke(context: CanvasRenderingContext2D | OffscreenCanvasRe
 }
 
 function drawHand(context:CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D,x:number,y:number,style:'classic'|'left'|'marker'){
+  const artwork=getHand(style)
+  if(artwork){context.save();context.translate(x,y);if(style==='left')context.scale(-1,1);if(style==='marker')context.filter='sepia(.4) saturate(.75) brightness(.8)';const scale=150/artwork.height;context.drawImage(artwork,-20,-22,artwork.width*scale,artwork.height*scale);context.restore();return}
   context.save();context.translate(x,y);if(style==='left')context.scale(-1,1);context.rotate(-.55)
   context.fillStyle=style==='marker'?'#82502f':'#e7b985';context.strokeStyle='#5b3727';context.lineWidth=2
   context.beginPath();context.roundRect(14,8,70,38,16);context.fill();context.stroke()
