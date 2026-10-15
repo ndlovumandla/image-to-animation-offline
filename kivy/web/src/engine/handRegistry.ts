@@ -17,8 +17,20 @@ async function makeTransparentHand(): Promise<ImageBitmap> {
   const canvas = new OffscreenCanvas(width, height)
   const context = canvas.getContext('2d')!
   context.drawImage(hand, left, top, width, height, 0, 0, width, height)
-  context.globalCompositeOperation = 'destination-in'
-  context.drawImage(mask, left, top, width, height, 0, 0, width, height)
+  const handPixels = context.getImageData(0, 0, width, height)
+  const croppedMask = new OffscreenCanvas(width, height)
+  const croppedMaskContext = croppedMask.getContext('2d')!
+  croppedMaskContext.drawImage(mask, left, top, width, height, 0, 0, width, height)
+  const croppedMaskPixels = croppedMaskContext.getImageData(0, 0, width, height).data
+  // The original OpenCV code treats white mask pixels as the hand and black
+  // pixels as transparent. Canvas destination-in cannot do that directly
+  // because the PNG's black pixels are still fully opaque, so transfer mask
+  // luminance into alpha explicitly.
+  for (let index = 0; index < handPixels.data.length; index += 4) {
+    handPixels.data[index + 3] = croppedMaskPixels[index]
+  }
+  context.clearRect(0, 0, width, height)
+  context.putImageData(handPixels, 0, 0)
   hand.close(); mask.close()
   return createImageBitmap(await canvas.convertToBlob({ type: 'image/png' }))
 }
