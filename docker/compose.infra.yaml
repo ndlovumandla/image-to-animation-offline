@@ -1,0 +1,115 @@
+# =============================================================================
+# Shared Edge & Infrastructure Services (docker/compose.infra.yaml)
+# Services:
+#   - sketch-caddy:       Central Reverse Proxy & Security Header Gateway
+#   - sketch-portainer:   Portainer CE 2.27.1 LTS (localhost + Cloudflare Access)
+#   - sketch-cloudflared: Cloudflare Tunnel Connector (enabled with --profile tunnel)
+# Usage:
+#   Local / LAN mode:
+#     docker compose -f docker/compose.infra.yaml up -d
+#   With Cloudflare Tunnel enabled:
+#     docker compose -f docker/compose.infra.yaml --profile tunnel up -d
+# =============================================================================
+
+name: sketch-infra
+
+services:
+  sketch-caddy:
+    image: caddy:2.9.1-alpine
+    container_name: sketch-caddy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+      PORTAINER_DOMAIN: ${PORTAINER_DOMAIN:-portainer.localhost}
+    ports:
+      - "127.0.0.1:${CADDY_HTTP_PORT:-8880}:80"
+    volumes:
+      - ../infrastructure/caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - /var/log/sketch-studio:/var/log/caddy
+    networks:
+      - edge_proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  sketch-portainer:
+    image: portainer/portainer-ce:2.27.1-alpine
+    container_name: sketch-portainer
+    command: ["--no-analytics"]
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      # Bound strictly to localhost (never 0.0.0.0) for SSH port-forwarding or local access
+      - "127.0.0.1:9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    networks:
+      - edge_proxy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  sketch-cloudflared:
+    image: cloudflare/cloudflared:2025.2.1
+    container_name: sketch-cloudflared
+    profiles:
+      - tunnel
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    networks:
+      - edge_proxy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+    name: sketch_caddy_data
+  caddy_config:
+    name: sketch_caddy_config
+  portainer_data:
+    name: sketch_portainer_data
+
+networks:
+  edge_proxy:
+    name: edge_proxy
+    external: true

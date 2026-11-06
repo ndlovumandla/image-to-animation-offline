@@ -1,0 +1,131 @@
+# =============================================================================
+# Central Caddy Reverse Proxy Configuration (infrastructure/caddy/Caddyfile)
+# Supports:
+#   1. Sketch Video Studio SPA + FastAPI AI service + Media Search Proxies
+#   2. Portainer CE administrative interface (protected via Cloudflare Access)
+#   3. Future multi-application virtual hosts on the same Ubuntu Server
+# =============================================================================
+
+{
+	admin off
+	auto_https off
+}
+
+# Reusable security headers snippet applied to all hosted applications
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+		-Server
+	}
+}
+
+# Reusable structured JSON access log snippet
+(access_log) {
+	log {
+		output file /var/log/caddy/access.log {
+			mode 0644
+			roll_size 10MiB
+			roll_keep 5
+			roll_keep_for 720h
+		}
+		format json
+	}
+}
+
+# =============================================================================
+# 1. Primary Application: Sketch Video Studio
+# Matches http://${APP_DOMAIN} (via Cloudflare Tunnel) and :80 (local health/testing)
+# =============================================================================
+http://{$APP_DOMAIN:localhost}, :80 {
+	import security_headers
+	import access_log
+
+	encode zstd gzip
+
+	# Edge proxy health check endpoint
+	handle /healthz {
+		respond "OK" 200
+	}
+
+	# Backend AI Service: Background removal (/api/remove) & Inpainting (/api/inpaint)
+	handle /api/* {
+		request_body {
+			max_size 20MB
+		}
+		reverse_proxy sketch-bg-api:7000 {
+			health_uri /health
+			health_interval 30s
+			health_timeout 5s
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 60s
+				read_timeout 60s
+				write_timeout 60s
+			}
+		}
+	}
+
+	# Backend AI health endpoint exposed at /api-health for operational monitoring
+	handle /api-health {
+		rewrite * /health
+		reverse_proxy sketch-bg-api:7000
+	}
+
+	# Wikimedia Commons API proxy (required by src/engine/mediaSearch.ts in production)
+	handle_path /commons/* {
+		reverse_proxy https://commons.wikimedia.org {
+			header_up Host commons.wikimedia.org
+			header_up User-Agent "SketchVideoStudio/1.0 (https://{$APP_DOMAIN:localhost}; educational sketch tool)"
+			transport http {
+				tls
+				dial_timeout 10s
+				response_header_timeout 15s
+			}
+		}
+	}
+
+	# Openverse API proxy (required by src/engine/mediaSearch.ts in production)
+	handle_path /openverse/* {
+		reverse_proxy https://api.openverse.org {
+			header_up Host api.openverse.org
+			header_up User-Agent "SketchVideoStudio/1.0 (https://{$APP_DOMAIN:localhost}; educational sketch tool)"
+			transport http {
+				tls
+				dial_timeout 10s
+				response_header_timeout 15s
+			}
+		}
+	}
+
+	# React Frontend SPA container
+	handle {
+		reverse_proxy sketch-web:8080 {
+			health_uri /healthz
+			health_interval 30s
+			health_timeout 5s
+		}
+	}
+}
+
+# =============================================================================
+# 2. Portainer CE Administrative UI (Protected by Cloudflare Zero Trust Access)
+# =============================================================================
+http://{$PORTAINER_DOMAIN:portainer.localhost} {
+	import security_headers
+	import access_log
+
+	reverse_proxy sketch-portainer:9000
+}
+
+# =============================================================================
+# 3. Template for Future Applications on the Same Ubuntu Server
+# =============================================================================
+# http://app2.yourdomain.com {
+# 	import security_headers
+# 	import access_log
+# 	reverse_proxy app2-container:3000
+# }

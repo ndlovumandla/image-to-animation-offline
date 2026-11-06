@@ -1,0 +1,30 @@
+# =============================================================================
+# Cloudflare Tunnel Configuration Template (infrastructure/cloudflare/config.example.yml)
+# Note: When using remotely managed tunnels via Zero Trust Dashboard, only
+# TUNNEL_TOKEN in /etc/sketch-studio/infra.env is required. If using a locally
+# managed configuration file, copy this to config.yml and supply credentials-file.
+# =============================================================================
+
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Primary Sketch Video Studio Application -> Central Caddy Reverse Proxy
+  - hostname: sketch.yourdomain.com
+    service: http://sketch-caddy:80
+    originRequest:
+      connectTimeout: 10s
+      noTLSVerify: false
+
+  # Portainer CE Administrative UI (MUST be protected by Cloudflare Access MFA Policy)
+  - hostname: portainer.yourdomain.com
+    service: http://sketch-caddy:80
+    originRequest:
+      connectTimeout: 10s
+
+  # Example Future Application #2
+  # - hostname: app2.yourdomain.com
+  #   service: http://sketch-caddy:80
+
+  # Mandatory catch-all rule rejecting unmatched hostnames
+  - service: http_status:404

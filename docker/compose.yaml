@@ -55,11 +55,18 @@ services:
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-20971520}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8880}
       U2NET_HOME: "/home/appuser/.u2net"
+      NUMBA_CACHE_DIR: "/home/appuser/.u2net/numba_cache"
       OMP_NUM_THREADS: "2"
     volumes:
       - u2net_models:/home/appuser/.u2net
     networks:
       - sketch_internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
     deploy:
       resources:
         limits:

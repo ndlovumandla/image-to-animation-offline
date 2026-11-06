@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # =============================================================================
 # Stage 1: Build isolated Python virtual environment for rembg + FastAPI + OpenCV
 # =============================================================================
@@ -40,6 +39,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     U2NET_HOME="/home/appuser/.u2net" \
+    NUMBA_CACHE_DIR="/home/appuser/.u2net/numba_cache" \
     OMP_NUM_THREADS="2" \
     HOST="0.0.0.0" \
     PORT="7000"

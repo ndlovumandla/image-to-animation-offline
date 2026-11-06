@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # =============================================================================
 # Stage 1: Build the React + TypeScript 7 + Vite 8 SPA (Debian glibc for native binaries)
 # =============================================================================
@@ -29,11 +28,16 @@ RUN addgroup -g 10001 -S appgroup \
 
 COPY --chown=appuser:appgroup --from=builder /app/dist /srv
 
-RUN printf ':8080 {\n\
+RUN cp /usr/bin/caddy /usr/bin/caddy.unpriv \
+    && mv /usr/bin/caddy.unpriv /usr/bin/caddy \
+    && printf ':8080 {\n\
     root * /srv\n\
     encode zstd gzip\n\
     handle /healthz {\n\
         respond "OK" 200\n\
+    }\n\
+    handle /api/* {\n\
+        reverse_proxy sketch-bg-api:7000\n\
     }\n\
     @immutable path /assets/* /hands/*\n\
     header @immutable Cache-Control "public, max-age=31536000, immutable"\n\

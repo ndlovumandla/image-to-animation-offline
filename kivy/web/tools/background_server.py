@@ -8,7 +8,6 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image
-from rembg import new_session, remove
 import uvicorn
 import cv2
 import numpy as np
@@ -39,11 +38,13 @@ def _get_session():
     if session is None:
         with session_lock:
             if session is None:
+                from rembg import new_session
                 session = new_session("u2net")
     return session
 
 
 def _run_remove(content: bytes) -> bytes:
+    from rembg import remove
     Image.open(BytesIO(content)).verify()
     active_session = _get_session()
     return remove(
