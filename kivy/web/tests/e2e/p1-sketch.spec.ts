@@ -11,6 +11,7 @@ test('uploads, traces, and deterministically scrubs a real image', async ({ page
     return canvas.toDataURL('image/png').split(',')[1]
   })
   await page.getByTestId('image-input').setInputFiles({ name: 'drawing.png', mimeType: 'image/png', buffer: Buffer.from(pngBase64, 'base64') })
+  await page.getByRole('button',{name:'Add drawing.png to timeline'}).click()
   await expect(page.getByTestId('scene-block')).toHaveCount(1, { timeout: 20_000 })
   await expect(page.getByText(/Tracing sketch/)).toHaveCount(0)
   const canvas = page.getByTestId('preview-canvas')

@@ -1,78 +1,81 @@
 #:import MDScreen kivymd.uix.screen.MDScreen
-#:import MDGridLayout kivymd.uix.gridlayout.MDGridLayout
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
+#:import MDCard kivymd.uix.card.MDCard
 #:import MDLabel kivymd.uix.label.MDLabel
-#:import MDTextField kivymd.uix.textfield.MDTextField
+#:import MDIcon kivymd.uix.label.MDIcon
 #:import MDFillRoundFlatIconButton kivymd.uix.button.MDFillRoundFlatIconButton
+#:import MDFillRoundFlatButton kivymd.uix.button.MDFillRoundFlatButton
 #:import MDIconButton kivymd.uix.button.MDIconButton
-
+#:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
+#:import MDProgressBar kivymd.uix.progressbar.MDProgressBar
+#:import MDScrollView kivymd.uix.scrollview.MDScrollView
+#:import MDSpinner kivymd.uix.spinner.MDSpinner
+#:import Slider kivy.uix.slider.Slider
 #:import dp kivy.metrics.dp
 #:import sp kivy.metrics.sp
-
-# Import local components
 #:import MyMDDivider screens.divider.MyMDDivider
 
-<TempSpinWait>:
-    id: temp_spin
-    orientation: 'horizontal'
-    adaptive_height: True
-    padding: dp(8)
 
-    MDLabel:
-        text: root.txt
-        font_style: "Subtitle1"
-        adaptive_width: True
+# ─────────────────────────────────────────────────────────────
+#  REUSABLE WIDGET TEMPLATES
+# ─────────────────────────────────────────────────────────────
+
+<TempSpinWait>:
+    orientation: 'vertical'
+    spacing: dp(16)
+    padding: dp(24)
+
+    Widget:
+        size_hint_y: 0.3
 
     MDSpinner:
         size_hint: None, None
-        size: dp(14), dp(14)
+        size: dp(52), dp(52)
         active: True
+        pos_hint: {"center_x": 0.5}
 
-<BatchStopBtn>:
-    orientation: 'horizontal'
-    spacing: dp(4)
-    adaptive_height: True
-    MDFloatingActionButton:
-        icon: 'stop'
-        type: 'small'
-        theme_icon_color: "Custom"
-        md_bg_color: '#e9dff7'
-        icon_color: '#211c29'
-        on_release: app.stop_batch()
+    MDLabel:
+        text: root.txt
+        halign: "center"
+        font_style: "Subtitle1"
+        theme_text_color: "Secondary"
+        adaptive_height: True
+
+    Widget:
+        size_hint_y: 0.4
+
 
 <VideoActionBtn>:
     orientation: 'horizontal'
-    spacing: dp(4)
+    spacing: dp(8)
     adaptive_height: True
-    MDFloatingActionButton:
+    padding: dp(4), 0
+
+    Widget:
+
+    MDFillRoundFlatIconButton:
+        text: "Save Video"
         icon: 'download'
-        type: 'small'
-        theme_icon_color: "Custom"
-        md_bg_color: '#e9dff7'
-        icon_color: '#211c29'
+        font_size: sp(13)
+        md_bg_color: "#2563EB"
         on_release: app.open_vid_file_manager()
-    MDFloatingActionButton:
-        icon: 'delete'
-        type: 'small'
-        theme_icon_color: "Custom"
-        md_bg_color: '#e9dff7'
-        icon_color: '#211c29'
+
+    MDFillRoundFlatIconButton:
+        text: "Delete"
+        icon: 'trash-can-outline'
+        font_size: sp(13)
+        md_bg_color: "#DC2626"
+        theme_text_color: "Custom"
+        text_color: [1, 1, 1, 1]
         on_release: app.current_delete_alert()
 
-<BatchImgFolderBtn>:
-    id: btn_img_fldr
-    text: "Batch"
-    icon: "folder"
-    font_size: sp(18)
-    md_bg_color: '#635a05'
-    pos_hint: {"center_x": .5, "center_y": .5}
-    #size_hint_x: 0.3
-    #size_hint_y: 0.9
-    on_release: app.open_img_fldr_manager()
+    Widget:
 
-<PreferencesPop>: # MDScrollView
+
+<PreferencesPop>:
     id: pop_preference
     size_hint: (1, None)
-    height: dp(300)
+    height: dp(240)
     MDList:
         adaptive_height: True
         OneLineIconListItem:
@@ -103,20 +106,23 @@
                 text_color: root.max_1080p_icon_colour
                 on_release: app.preference_toggle(self, "max_1080p")
 
-<OldFileMgrBox>: #MDBoxLayout
+
+<OldFileMgrBox>:
     id: old_file_mgr
     orientation: 'vertical'
-    padding: dp(10)
-    spacing: dp(4)
+    padding: dp(12)
+    spacing: dp(6)
     MDLabel:
-        text: "If your download is successful, the file will be deleted from internal storage"
+        text: "Saved Sketches & Studio Videos"
+        font_style: "H6"
         adaptive_height: True
 
-<ManageOldFilesScrl>: # MDScrollView
-    adaptive_height: True
-    # MDList will be added here from app
 
-<OldFileItem>: #OneLineAvatarIconListItem
+<ManageOldFilesScrl>:
+    adaptive_height: True
+
+
+<OldFileItem>:
     text: root.vid_file_name
     IconLeftWidget:
         icon: "download"
@@ -126,243 +132,723 @@
         on_release: app.old_file_action(self, "delete", root.vid_file_name)
 
 
-### The kivymd main screen ###
-MDScreen:
+# ─────────────────────────────────────────────────────────────
+#  TIMELINE SCENE CARD
+# ─────────────────────────────────────────────────────────────
 
-    MainBox: # main container
-        orientation: 'vertical'
-        padding: 0, self.top_pad, 0, self.bottom_pad # left, top, right, bottom
+<TimelineSceneCard>:
+    orientation: 'vertical'
+    size_hint: None, None
+    size: dp(130), dp(112)
+    radius: [dp(10)]
+    md_bg_color: root.bg_color
+    line_color: root.border_color
+    line_width: root.border_width
+    padding: dp(5), dp(5)
+    spacing: dp(3)
+    on_release: app.select_scene_by_id(root.scene_id)
+
+    # Top row: scene label + delete btn
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(20)
+        spacing: dp(2)
+        MDLabel:
+            text: root.scene_title
+            font_style: "Caption"
+            bold: True
+            theme_text_color: "Custom"
+            text_color: root.text_color
+            shorten: True
+            size_hint_x: 0.8
+        MDIconButton:
+            icon: "close-circle"
+            size_hint: None, None
+            size: dp(20), dp(20)
+            theme_icon_color: "Custom"
+            icon_color: [0.9, 0.3, 0.3, 1]
+            on_release: app.delete_scene_by_id(root.scene_id)
+
+    # Thumbnail area
+    MDBoxLayout:
+        id: thumb_container
+        size_hint_y: 0.55
+        pos_hint: {"center_x": 0.5}
+        canvas.before:
+            Color:
+                rgba: 0.08, 0.08, 0.1, 1
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(6)]
+
+    # Bottom row: audio icon + duration badge
+    MDBoxLayout:
+        size_hint_y: None
+        height: dp(20)
         spacing: dp(4)
+        padding: dp(2), 0
+        MDIcon:
+            icon: root.audio_icon
+            font_size: sp(12)
+            size_hint: None, None
+            size: dp(14), dp(14)
+            theme_text_color: "Custom"
+            text_color: root.badge_color
+        MDLabel:
+            text: root.duration_text
+            font_style: "Caption"
+            font_size: sp(10)
+            theme_text_color: "Custom"
+            text_color: root.badge_color
+            shorten: True
 
-        MDTopAppBar:
-            title: "Image2Sketch Animation"
-            left_action_items: [["menu", lambda x: app.menu_bar_callback(x)]]
-            md_bg_color: '#7643a8'
 
-        MDGridLayout: # top file browser
-            id: file_choose_grid
-            cols: 4
-            size_hint_y: 0.1
-            spacing: dp(4)
-            padding: 8, 10, 8, 10 # left, top, right, bottom
+<AddSceneCard>:
+    size_hint: None, None
+    size: dp(90), dp(112)
+    radius: [dp(10)]
+    md_bg_color: [0.14, 0.14, 0.18, 0.5]
+    line_color: [0.4, 0.4, 0.5, 0.6]
+    line_width: 1.5
+    on_release: app.add_new_scene()
 
-            MDLabel:
-                id: img_selector_lbl
-                text: "Select an image file >"
+    MDBoxLayout:
+        orientation: 'vertical'
+        padding: dp(8)
+        spacing: dp(6)
+
+        Widget:
+            size_hint_y: 0.2
+
+        MDIcon:
+            icon: "plus-circle-outline"
+            size_hint: None, None
+            size: dp(36), dp(36)
+            pos_hint: {"center_x": 0.5}
+            theme_text_color: "Custom"
+            text_color: [0.95, 0.65, 0.15, 1]
+
+        MDLabel:
+            text: "Add Scene"
+            halign: "center"
+            font_style: "Caption"
+            theme_text_color: "Hint"
+            adaptive_height: True
+
+        Widget:
+            size_hint_y: 0.2
+
+
+# ─────────────────────────────────────────────────────────────
+#  SECTION HEADER (reusable look)
+# ─────────────────────────────────────────────────────────────
+
+<SectionHeader>:
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: dp(28)
+    spacing: dp(6)
+    MDIcon:
+        icon: root.icon
+        font_size: sp(14)
+        size_hint: None, None
+        size: dp(16), dp(16)
+        theme_text_color: "Custom"
+        text_color: root.icon_color
+    MDLabel:
+        text: root.title
+        font_style: "Overline"
+        bold: True
+        theme_text_color: "Custom"
+        text_color: root.title_color
+        size_hint_x: 1
+
+
+# ─────────────────────────────────────────────────────────────
+#  MAIN SCREEN
+# ─────────────────────────────────────────────────────────────
+
+MDScreen:
+    MainBox:
+        orientation: 'vertical'
+        padding: 0, self.top_pad, 0, self.bottom_pad
+        spacing: 0
+
+        # ── TOP APP BAR ──────────────────────────────────────
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(56)
+            padding: dp(12), dp(8)
+            spacing: dp(8)
+            md_bg_color: "#1A0A2E"
+
+            canvas.before:
+                Color:
+                    rgba: 0.05, 0.02, 0.12, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                Color:
+                    rgba: 0.42, 0.25, 0.72, 1
+                Rectangle:
+                    pos: self.x, self.y
+                    size: self.width, dp(1.5)
+
+            # Logo / Title group
+            MDBoxLayout:
+                size_hint_x: None
+                width: dp(210)
+                spacing: dp(8)
+                MDIconButton:
+                    icon: "menu"
+                    size_hint: None, None
+                    size: dp(38), dp(38)
+                    theme_icon_color: "Custom"
+                    icon_color: [0.9, 0.9, 0.95, 1]
+                    on_release: app.menu_bar_callback(self)
+                MDIcon:
+                    icon: "pencil-ruler"
+                    font_size: sp(20)
+                    size_hint: None, None
+                    size: dp(24), dp(24)
+                    theme_text_color: "Custom"
+                    text_color: [0.72, 0.45, 1.0, 1]
+                MDLabel:
+                    text: "Sketch Studio"
+                    font_style: "H6"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: [0.95, 0.95, 1.0, 1]
+                    adaptive_width: True
+
+            Widget:
+
+            # Render & Export action buttons (top-right)
+            MDFillRoundFlatIconButton:
+                text: "Render Scene"
+                icon: "play-circle-outline"
+                font_size: sp(13)
                 size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.7
-                #pos_hint: {"y": 0.1}
-                #valign: 'top'
-                #halign: 'right'
+                height: dp(38)
+                md_bg_color: "#5B21B6"
+                on_release: app.render_current_scene()
 
             MDFillRoundFlatIconButton:
-                id: btn_img_upload
-                text: "Upload"
-                icon: "file-image"
-                font_size: sp(18)
-                #md_bg_color: '#f8d7e3'
-                pos_hint: {"center_x": .5, "center_y": .5}
-                #size_hint_x: 0.3
-                #size_hint_y: 0.9
-                on_release: app.open_img_file_manager()
-
-        MyMDDivider:
-            color: (0, 0, 0, 0.25)
-
-        MDGridLayout: # video player
-            id: player_box
-            cols: 1
-            size_hint_y: 0.4
-            padding: 2, 4, 2, 4 # left, top, right, bottom
-            spacing: dp(4)
-
-            # video player will be added under this box from main program
-
-        MyMDDivider:
-            color: (0, 0, 0, 0.25)
-
-        MDGridLayout: # params main sketch
-            cols: 5
-            size_hint_y: 0.2
-            spacing: dp(4)
-            padding: 2, 10, 2, 2 # left, top, right, bottom
-            ## Split len, Frame rate, Object skip rate, Background skip rate, Original image duration
-
-            # hint texts in first row
-            MDLabel:
-                text: "Video speed"
-                font_style: 'Caption'
+                text: "Export Video"
+                icon: "movie-open-play"
+                font_size: sp(13)
                 size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            MDLabel:
-                text: "Frame rate"
-                font_style: 'Caption'
-                size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            MDLabel:
-                text: "Object skip rate"
-                font_style: 'Caption'
-                size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            MDLabel:
-                text: "Background skip rate"
-                font_style: 'Caption'
-                size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            MDLabel:
-                text: "End image duration"
-                font_style: 'Caption'
-                size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            # taking the values in next row
-            MDDropDownItem:
-                id: split_len_drp
-                md_bg_color: "#bdc6b0"
-                on_release: app.split_len_options.open()
-                text: "speed"
-                font_size: sp(14)
-                size_hint_x: 0.2
-
-            MDTextField:
-                id: frame_rate
-                text: "25"
-                input_filter: 'int'
-                max_text_length: 2
-                hint_text: "fps"
-                helper_text: "default: 25"
-                helper_text_mode: "persistent"
-                mode: "rectangle"
-                size_hint_x: 0.2
-                font_size: sp(14)
-
-            MDTextField:
-                id: obj_skip_rate
-                text: "8"
-                input_filter: 'int'
-                max_text_length: 2
-                hint_text: "obj skip"
-                helper_text: "default: 8"
-                helper_text_mode: "persistent"
-                mode: "rectangle"
-                size_hint_x: 0.2
-                font_size: sp(14)
-
-            MDTextField:
-                id: bck_skip_rate
-                text: "14"
-                input_filter: 'int'
-                max_text_length: 2
-                hint_text: "bg skip"
-                helper_text: "default: 14"
-                helper_text_mode: "persistent"
-                mode: "rectangle"
-                size_hint_x: 0.2
-                font_size: sp(14)
-
-            MDTextField:
-                id: main_img_duration
-                text: "2"
-                input_filter: 'int'
-                max_text_length: 1
-                hint_text: "sec"
-                helper_text: "default: 2"
-                helper_text_mode: "persistent"
-                mode: "rectangle"
-                size_hint_x: 0.2
-                font_size: sp(14)
-
-        MDGridLayout: # params colour
-            cols: 2
-            size_hint_y: 0.2
-            spacing: dp(4)
-            padding: 2, 2, 2, 10 # left, top, right, bottom
-            ## Colour speed, Gap PX
-
-            # hint texts in first row
-            MDLabel:
-                text: "Colour speed"
-                font_style: 'Caption'
-                size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            MDLabel:
-                text: "Colour Gap"
-                font_style: 'Caption'
-                size_hint_y: None
-                height: self.texture_size[1]
-                size_hint_x: 0.2
-
-            MDTextField:
-                id: fill_speed
-                text: "8"
-                input_filter: 'int'
-                max_text_length: 2
-                hint_text: "cl sp"
-                helper_text: "default: 8"
-                helper_text_mode: "persistent"
-                mode: "rectangle"
-                size_hint_x: 0.2
-                font_size: sp(14)
-
-            MDTextField:
-                id: gap_px
-                text: "4"
-                input_filter: 'int'
-                max_text_length: 2
-                hint_text: "px"
-                helper_text: "default: 4"
-                helper_text_mode: "persistent"
-                mode: "rectangle"
-                size_hint_x: 0.2
-                font_size: sp(14)
-
-        MDGridLayout: # buttons
-            cols: 3
-            size_hint_y: 0.1
-            spacing: dp(4)
-            padding: 14, 0, 14, 0 # left, top, right, bottom
+                height: dp(38)
+                md_bg_color: "#B45309"
+                on_release: app.export_full_video()
 
             MDIconButton:
-                id: btn_end_img
-                #text: ""
-                #text_color: 'black'
-                icon: "tune-variant" #toggle-switch
+                icon: "tune"
+                size_hint: None, None
+                size: dp(40), dp(40)
                 theme_icon_color: "Custom"
-                icon_color: "blue"
-                icon_size: sp(18)
-                md_bg_color: 'gray'
-                pos_hint: {"center_x": .5, "center_y": .5}
-                size_hint_x: 0.2
+                icon_color: [0.75, 0.75, 0.8, 1]
                 on_release: app.popup_preference()
 
-            MDFillRoundFlatIconButton:
-                id: btn_submit
-                text: "Submit"
-                icon: "send"
-                font_size: sp(18)
-                md_bg_color: 'orange'
-                pos_hint: {"center_x": .5, "center_y": .5}
-                size_hint_x: 0.5
-                on_release: app.submit_sketch_req()
 
-            MDFillRoundFlatIconButton:
-                id: btn_reset
-                text: "Reset"
-                icon: "undo-variant"
-                font_size: sp(18)
-                md_bg_color: '#333036'
-                pos_hint: {"center_x": .5, "center_y": .5}
-                size_hint_x: 0.3
-                on_release: app.reset_all()
+        # ── CENTRAL WORKSPACE ────────────────────────────────
+        MDBoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.72
+            padding: dp(8), dp(8)
+            spacing: dp(8)
+            md_bg_color: "#0F0A1A"
+
+            canvas.before:
+                Color:
+                    rgba: 0.06, 0.04, 0.1, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            # ── LEFT: STAGE (preview canvas) ─────────────────
+            MDBoxLayout:
+                orientation: 'vertical'
+                size_hint_x: 0.65
+                spacing: dp(6)
+
+                # Stage card
+                MDCard:
+                    id: stage_card
+                    size_hint_y: 0.92
+                    radius: [dp(12)]
+                    md_bg_color: "#0D0D14"
+                    line_color: [0.22, 0.18, 0.32, 1]
+                    line_width: 1.5
+                    padding: dp(4)
+
+                    MDBoxLayout:
+                        id: player_box
+                        orientation: 'vertical'
+
+                # Stage bottom status bar
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: dp(36)
+                    spacing: dp(10)
+                    padding: dp(6), 0
+
+                    MDIconButton:
+                        icon: "chevron-left-circle-outline"
+                        size_hint: None, None
+                        size: dp(34), dp(34)
+                        theme_icon_color: "Custom"
+                        icon_color: [0.7, 0.6, 0.85, 1]
+                        on_release: app.prev_scene()
+
+                    MDLabel:
+                        id: stage_status_lbl
+                        text: "Scene 1"
+                        font_style: "Body2"
+                        theme_text_color: "Secondary"
+                        halign: "center"
+
+                    MDIconButton:
+                        icon: "chevron-right-circle-outline"
+                        size_hint: None, None
+                        size: dp(34), dp(34)
+                        theme_icon_color: "Custom"
+                        icon_color: [0.7, 0.6, 0.85, 1]
+                        on_release: app.next_scene()
+
+
+            # ── RIGHT: INSPECTOR PANEL ────────────────────────
+            MDCard:
+                size_hint_x: 0.35
+                radius: [dp(12)]
+                md_bg_color: "#12101E"
+                line_color: [0.22, 0.18, 0.32, 1]
+                line_width: 1
+
+                MDScrollView:
+                    do_scroll_x: False
+                    bar_width: dp(3)
+                    bar_color: [0.45, 0.28, 0.8, 0.6]
+
+                    MDBoxLayout:
+                        orientation: 'vertical'
+                        adaptive_height: True
+                        padding: dp(14), dp(14)
+                        spacing: dp(14)
+
+                        # ── Scene Navigation ──────────────────
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(4)
+
+                            MDIconButton:
+                                icon: "chevron-left"
+                                size_hint: None, None
+                                size: dp(34), dp(34)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.75, 0.6, 1.0, 1]
+                                on_release: app.prev_scene()
+
+                            MDLabel:
+                                id: insp_scene_title
+                                text: "Scene 1 of 1"
+                                font_style: "Subtitle1"
+                                bold: True
+                                halign: "center"
+                                theme_text_color: "Custom"
+                                text_color: [0.95, 0.92, 1.0, 1]
+
+                            MDIconButton:
+                                icon: "chevron-right"
+                                size_hint: None, None
+                                size: dp(34), dp(34)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.75, 0.6, 1.0, 1]
+                                on_release: app.next_scene()
+
+                        MyMDDivider:
+                            color: [0.28, 0.22, 0.42, 1]
+
+                        # ── PICTURE Section ───────────────────
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(6)
+
+                            MDIcon:
+                                icon: "image-outline"
+                                font_size: sp(13)
+                                size_hint: None, None
+                                size: dp(16), dp(16)
+                                theme_text_color: "Custom"
+                                text_color: [0.65, 0.5, 0.95, 1]
+
+                            MDLabel:
+                                text: "PICTURE"
+                                font_style: "Overline"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: [0.65, 0.5, 0.95, 1]
+
+                        # Image name
+                        MDLabel:
+                            id: insp_img_name
+                            text: "No image selected"
+                            font_style: "Caption"
+                            theme_text_color: "Hint"
+                            shorten: True
+                            adaptive_height: True
+
+                        MDFillRoundFlatIconButton:
+                            text: "Upload Image"
+                            icon: "image-plus"
+                            font_size: sp(13)
+                            size_hint_x: 1
+                            height: dp(40)
+                            size_hint_y: None
+                            md_bg_color: "#3B1F6E"
+                            on_release: app.open_img_file_manager()
+
+                        MyMDDivider:
+                            color: [0.28, 0.22, 0.42, 1]
+
+                        # ── AUDIO Section ─────────────────────
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(6)
+
+                            MDIcon:
+                                icon: "music-note"
+                                font_size: sp(13)
+                                size_hint: None, None
+                                size: dp(16), dp(16)
+                                theme_text_color: "Custom"
+                                text_color: [0.2, 0.75, 0.55, 1]
+
+                            MDLabel:
+                                text: "AUDIO & VOICEOVER"
+                                font_style: "Overline"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: [0.2, 0.75, 0.55, 1]
+
+                        MDLabel:
+                            id: insp_audio_info
+                            text: "No audio attached  —  Default 4.0s"
+                            font_style: "Caption"
+                            theme_text_color: "Hint"
+                            shorten: True
+                            adaptive_height: True
+
+                        # Audio controls row
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(6)
+
+                            MDFillRoundFlatIconButton:
+                                id: btn_audio_upload
+                                text: "Add Audio Track"
+                                icon: "music-note-plus"
+                                font_size: sp(13)
+                                size_hint_x: 1
+                                size_hint_y: None
+                                height: dp(40)
+                                md_bg_color: "#1A4A6E"
+                                on_release: app.open_audio_file_manager()
+
+                            MDIconButton:
+                                id: btn_audio_play
+                                icon: "play-circle"
+                                size_hint: None, None
+                                size: dp(40), dp(40)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.2, 0.85, 0.45, 1]
+                                on_release: app.toggle_audio_playback()
+
+                            MDIconButton:
+                                id: btn_audio_remove
+                                icon: "trash-can-outline"
+                                size_hint: None, None
+                                size: dp(40), dp(40)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.85, 0.25, 0.25, 1]
+                                on_release: app.remove_current_scene_audio()
+
+                        MyMDDivider:
+                            color: [0.28, 0.22, 0.42, 1]
+
+                        # ── TIMING & SPEED Section ────────────
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(6)
+
+                            MDIcon:
+                                icon: "timer-outline"
+                                font_size: sp(13)
+                                size_hint: None, None
+                                size: dp(16), dp(16)
+                                theme_text_color: "Custom"
+                                text_color: [0.9, 0.65, 0.15, 1]
+
+                            MDLabel:
+                                text: "TIMING & SPEED"
+                                font_style: "Overline"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: [0.9, 0.65, 0.15, 1]
+
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(8)
+
+                            MDLabel:
+                                id: insp_duration_lbl
+                                text: "Duration: 4.0s"
+                                font_style: "Body2"
+                                theme_text_color: "Primary"
+                                size_hint_x: 0.35
+
+                            MDIconButton:
+                                icon: "minus-circle-outline"
+                                size_hint: None, None
+                                size: dp(32), dp(32)
+                                on_release: app.adjust_current_scene_duration(-0.5)
+
+                            MDIconButton:
+                                icon: "plus-circle-outline"
+                                size_hint: None, None
+                                size: dp(32), dp(32)
+                                on_release: app.adjust_current_scene_duration(0.5)
+
+                            MDDropDownItem:
+                                id: split_len_drp
+                                text: "Speed: 10"
+                                font_size: sp(12)
+                                size_hint_x: 0.4
+                                size_hint_y: None
+                                height: dp(36)
+                                on_release: app.open_split_len_menu()
+
+                        MyMDDivider:
+                            color: [0.28, 0.22, 0.42, 1]
+
+                        # ── SCENE CONTROLS Section ────────────
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(6)
+
+                            MDIcon:
+                                icon: "layers-outline"
+                                font_size: sp(13)
+                                size_hint: None, None
+                                size: dp(16), dp(16)
+                                theme_text_color: "Custom"
+                                text_color: [0.45, 0.75, 0.95, 1]
+
+                            MDLabel:
+                                text: "SCENE CONTROLS"
+                                font_style: "Overline"
+                                bold: True
+                                theme_text_color: "Custom"
+                                text_color: [0.45, 0.75, 0.95, 1]
+
+                        # Control buttons grid
+                        MDBoxLayout:
+                            adaptive_height: True
+                            spacing: dp(6)
+
+                            MDIconButton:
+                                icon: "arrow-left-bold"
+                                size_hint: None, None
+                                size: dp(40), dp(40)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.75, 0.7, 0.9, 1]
+                                on_release: app.move_scene_left()
+
+                            MDIconButton:
+                                icon: "arrow-right-bold"
+                                size_hint: None, None
+                                size: dp(40), dp(40)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.75, 0.7, 0.9, 1]
+                                on_release: app.move_scene_right()
+
+                            MDIconButton:
+                                icon: "content-copy"
+                                size_hint: None, None
+                                size: dp(40), dp(40)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.55, 0.75, 0.95, 1]
+                                on_release: app.duplicate_current_scene()
+
+                            Widget:
+
+                            MDIconButton:
+                                icon: "delete-outline"
+                                size_hint: None, None
+                                size: dp(40), dp(40)
+                                theme_icon_color: "Custom"
+                                icon_color: [0.92, 0.25, 0.25, 1]
+                                on_release: app.delete_current_scene()
+
+
+        # ── BOTTOM TIMELINE / FILMSTRIP ───────────────────────
+        MDBoxLayout:
+            id: timeline_root
+            size_hint_y: None
+            height: dp(150)
+            orientation: 'vertical'
+
+            canvas.before:
+                Color:
+                    rgba: 0.05, 0.03, 0.09, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                Color:
+                    rgba: 0.35, 0.22, 0.55, 1
+                Rectangle:
+                    pos: self.x, self.top - dp(1)
+                    size: self.width, dp(1)
+
+            # Timeline header row
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(34)
+                padding: dp(14), dp(5)
+                spacing: dp(10)
+
+                MDIcon:
+                    icon: "filmstrip"
+                    font_size: sp(15)
+                    size_hint: None, None
+                    size: dp(18), dp(18)
+                    theme_text_color: "Custom"
+                    text_color: [0.65, 0.5, 0.95, 1]
+
+                MDLabel:
+                    id: timeline_summary_lbl
+                    text: "TIMELINE  —  1 Scene  (Total: 4.0s)"
+                    font_style: "Caption"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: [0.8, 0.75, 0.95, 1]
+
+                Widget:
+
+                MDIconButton:
+                    icon: "chevron-down" if app.timeline_expanded else "chevron-up"
+                    size_hint: None, None
+                    size: dp(30), dp(28)
+                    tooltip_text: "Hide timeline" if app.timeline_expanded else "Show timeline"
+                    on_release: app.toggle_timeline()
+
+                MDFillRoundFlatIconButton:
+                    text: "Add Scene"
+                    icon: "plus"
+                    font_size: sp(11)
+                    size_hint_y: None
+                    height: dp(28)
+                    md_bg_color: "#3B1F6E"
+                    on_release: app.add_new_scene()
+
+            # Scene filmstrip scrollable area
+            MDScrollView:
+                do_scroll_y: False
+                do_scroll_x: True
+                bar_width: dp(3)
+                bar_color: [0.55, 0.38, 0.88, 0.7]
+                size_hint_y: None
+                height: dp(112)
+
+                MDBoxLayout:
+                    id: timeline_strip
+                    orientation: 'horizontal'
+                    adaptive_width: True
+                    spacing: dp(10)
+                    padding: dp(12), dp(4)
+
+            MDBoxLayout:
+                id: expanded_panel
+                orientation: 'vertical'
+                size_hint_y: None
+                height: 0
+                opacity: 0
+                spacing: dp(3)
+
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: dp(34)
+                    padding: dp(8), 0
+                    spacing: dp(4)
+
+                    MDIconButton:
+                        icon: "play" if not app.is_playing_timeline else "pause"
+                        size_hint: None, None
+                        size: dp(32), dp(32)
+                        on_release: app.toggle_timeline_playback()
+
+                    MDLabel:
+                        id: timeline_time_lbl
+                        text: "0.0 / 4.0s"
+                        size_hint_x: None
+                        width: dp(92)
+                        font_style: "Caption"
+
+                    MDFillRoundFlatIconButton:
+                        text: "Add Audio"
+                        icon: "music-note-plus"
+                        font_size: sp(10)
+                        size_hint_y: None
+                        height: dp(28)
+                        on_release: app.open_audio_file_manager()
+
+                    MDIconButton:
+                        icon: "arrow-left"
+                        size_hint: None, None
+                        size: dp(30), dp(30)
+                        on_release: app.nudge_selected_audio(-0.1)
+
+                    MDIconButton:
+                        icon: "arrow-right"
+                        size_hint: None, None
+                        size: dp(30), dp(30)
+                        on_release: app.nudge_selected_audio(0.1)
+
+                    MDIconButton:
+                        icon: "content-cut"
+                        size_hint: None, None
+                        size: dp(30), dp(30)
+                        on_release: app.split_selected_audio()
+
+                    MDIconButton:
+                        icon: "delete-outline"
+                        size_hint: None, None
+                        size: dp(30), dp(30)
+                        on_release: app.delete_selected_audio()
+
+                    MDLabel:
+                        text: "Clip volume"
+                        size_hint_x: None
+                        width: dp(74)
+                        font_style: "Caption"
+
+                    Slider:
+                        min: 0
+                        max: 2
+                        value: 1
+                        step: 0.05
+                        on_value: app.set_selected_clip_volume(self.value)
+
+                MDScrollView:
+                    do_scroll_y: True
+                    do_scroll_x: True
+                    bar_width: dp(4)
+
+                    MDBoxLayout:
+                        id: expanded_tracks
+                        orientation: 'vertical'
+                        adaptive_height: True
+                        adaptive_width: True
+                        spacing: dp(3)
+                        padding: dp(8), dp(3)

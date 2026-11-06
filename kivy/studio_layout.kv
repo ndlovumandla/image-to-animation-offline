@@ -1,0 +1,309 @@
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
+#:import MDCard kivymd.uix.card.MDCard
+#:import MDLabel kivymd.uix.label.MDLabel
+#:import MDIcon kivymd.uix.label.MDIcon
+#:import MDIconButton kivymd.uix.button.MDIconButton
+#:import MDFillRoundFlatIconButton kivymd.uix.button.MDFillRoundFlatIconButton
+#:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
+#:import MDScrollView kivymd.uix.scrollview.MDScrollView
+#:import MDSpinner kivymd.uix.spinner.MDSpinner
+#:import MDList kivymd.uix.list.MDList
+#:import OneLineIconListItem kivymd.uix.list.OneLineIconListItem
+#:import IconLeftWidget kivymd.uix.list.IconLeftWidget
+#:import Slider kivy.uix.slider.Slider
+#:import dp kivy.metrics.dp
+#:import sp kivy.metrics.sp
+
+<TempSpinWait>:
+    orientation: "vertical"
+    spacing: dp(16)
+    padding: dp(24)
+    MDSpinner:
+        size_hint: None, None
+        size: dp(48), dp(48)
+        active: True
+        pos_hint: {"center_x": .5}
+    MDLabel:
+        text: root.txt
+        halign: "center"
+        adaptive_height: True
+
+<VideoActionBtn>:
+    orientation: "horizontal"
+    adaptive_height: True
+    MDFillRoundFlatIconButton:
+        text: "Save Video"
+        icon: "download"
+        on_release: app.open_vid_file_manager()
+    MDFillRoundFlatIconButton:
+        text: "Delete"
+        icon: "delete"
+        on_release: app.current_delete_alert()
+
+<PreferencesPop>:
+    size_hint: 1, None
+    height: dp(220)
+    MDList:
+        adaptive_height: True
+        OneLineIconListItem:
+            text: "Draw Colour"
+            on_release: app.preference_toggle(self, "end_colour")
+        OneLineIconListItem:
+            text: "Hand on Video"
+            on_release: app.preference_toggle(self, "draw_hand")
+        OneLineIconListItem:
+            text: "1080p canvas"
+            on_release: app.preference_toggle(self, "max_1080p")
+
+<OldFileMgrBox>:
+    orientation: "vertical"
+    padding: dp(12)
+    spacing: dp(6)
+
+<ManageOldFilesScrl>:
+    adaptive_height: True
+
+<OldFileItem>:
+    text: root.vid_file_name
+
+MDScreen:
+    md_bg_color: "#F2F3F7"
+
+    MainBox:
+        orientation: "vertical"
+        padding: 0, self.top_pad, 0, self.bottom_pad
+
+        # Compact editor toolbar: canvas remains the visual focus.
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(54)
+            padding: dp(12), dp(6)
+            spacing: dp(8)
+            md_bg_color: "#FFFFFF"
+
+            MDIconButton:
+                icon: "menu"
+                on_release: app.menu_bar_callback(self)
+
+            MDLabel:
+                text: "Sketch Video"
+                bold: True
+                font_style: "H6"
+                theme_text_color: "Custom"
+                text_color: "#25262B"
+                size_hint_x: None
+                width: dp(145)
+
+            MDFillRoundFlatIconButton:
+                text: "Add image"
+                icon: "image-plus"
+                md_bg_color: "#7D2AE8"
+                on_release: app.open_img_file_manager()
+
+            MDFillRoundFlatIconButton:
+                id: btn_audio_upload
+                text: "Add audio"
+                icon: "music-note-plus"
+                md_bg_color: "#E8E9EE"
+                theme_text_color: "Custom"
+                text_color: "#25262B"
+                on_release: app.open_audio_file_manager()
+
+            MDDropDownItem:
+                id: split_len_drp
+                text: "Speed: 10"
+                size_hint_x: None
+                width: dp(105)
+                on_release: app.open_split_len_menu()
+
+            Widget:
+
+            MDFillRoundFlatIconButton:
+                text: "Render scene"
+                icon: "draw"
+                md_bg_color: "#E8E9EE"
+                theme_text_color: "Custom"
+                text_color: "#25262B"
+                on_release: app.render_current_scene()
+
+            MDFillRoundFlatIconButton:
+                text: "Export"
+                icon: "export"
+                md_bg_color: "#7D2AE8"
+                on_release: app.export_full_video()
+
+        # Large central preview, matching the supplied editor reference.
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: dp(22), dp(12), dp(22), 0
+            md_bg_color: "#F2F3F7"
+
+            MDCard:
+                size_hint: .78, 1
+                pos_hint: {"center_x": .5}
+                radius: [dp(2)]
+                elevation: 3
+                md_bg_color: "#FFFFFF"
+                padding: dp(4)
+
+                MDBoxLayout:
+                    id: player_box
+                    orientation: "vertical"
+
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(52)
+                spacing: dp(8)
+                padding: dp(8), dp(5)
+
+                Widget:
+                MDLabel:
+                    id: insp_scene_title
+                    text: "Scene 1 of 1"
+                    size_hint_x: None
+                    width: dp(90)
+                    halign: "right"
+                    theme_text_color: "Custom"
+                    text_color: "#25262B"
+                    font_style: "Caption"
+                MDLabel:
+                    id: timeline_time_lbl
+                    text: "0:00 / 0:04"
+                    size_hint_x: None
+                    width: dp(85)
+                    halign: "right"
+                    theme_text_color: "Custom"
+                    text_color: "#25262B"
+                    bold: True
+                MDIconButton:
+                    icon: "play-circle"
+                    theme_icon_color: "Custom"
+                    icon_color: "#25262B"
+                    on_release: app.toggle_timeline_playback()
+                MDLabel:
+                    id: stage_status_lbl
+                    text: "Scene 1 — Empty"
+                    size_hint_x: None
+                    width: dp(170)
+                    theme_text_color: "Custom"
+                    text_color: "#55575E"
+                    font_style: "Caption"
+                Widget:
+
+            # Compatibility/status ids used by the controller.
+            MDBoxLayout:
+                size_hint_y: None
+                height: 0
+                opacity: 0
+                MDLabel:
+                    id: insp_img_name
+                MDLabel:
+                    id: insp_duration_lbl
+                MDLabel:
+                    id: insp_audio_info
+                MDIconButton:
+                    id: btn_audio_play
+                MDIconButton:
+                    id: btn_audio_remove
+
+        # Full-width Canva-style timeline.
+        MDBoxLayout:
+            id: timeline_root
+            orientation: "vertical"
+            size_hint_y: None
+            height: dp(260)
+            padding: dp(14), dp(5)
+            spacing: dp(4)
+            md_bg_color: "#FFFFFF"
+
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(28)
+                spacing: dp(8)
+                MDLabel:
+                    id: timeline_summary_lbl
+                    text: "Timeline"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: "#25262B"
+                MDLabel:
+                    text: "0s        10s        20s        30s        40s        50s        1:00"
+                    halign: "center"
+                    theme_text_color: "Custom"
+                    text_color: "#74767D"
+                    font_style: "Caption"
+                MDIconButton:
+                    icon: "minus"
+                    size_hint: None, None
+                    size: dp(28), dp(28)
+                MDIconButton:
+                    icon: "plus"
+                    size_hint: None, None
+                    size: dp(28), dp(28)
+
+            MDScrollView:
+                do_scroll_y: False
+                do_scroll_x: True
+                size_hint_y: None
+                height: dp(106)
+                bar_width: dp(3)
+                MDBoxLayout:
+                    id: timeline_strip
+                    orientation: "horizontal"
+                    adaptive_width: True
+                    spacing: dp(3)
+                    padding: dp(4), dp(3)
+
+            MDBoxLayout:
+                size_hint_y: None
+                height: dp(48)
+                padding: dp(6), dp(3)
+                spacing: dp(8)
+                md_bg_color: "#F0F1F4"
+                MDIconButton:
+                    icon: "plus"
+                    theme_icon_color: "Custom"
+                    icon_color: "#25262B"
+                    on_release: app.open_img_file_manager()
+                MDLabel:
+                    text: "or drag and drop media"
+                    theme_text_color: "Custom"
+                    text_color: "#55575E"
+                    font_style: "Caption"
+                Widget:
+                MDIconButton:
+                    icon: "content-cut"
+                    on_release: app.split_selected_audio()
+                MDIconButton:
+                    icon: "delete-outline"
+                    on_release: app.delete_selected_audio()
+                MDLabel:
+                    text: "Volume"
+                    size_hint_x: None
+                    width: dp(48)
+                    font_style: "Caption"
+                Slider:
+                    min: 0
+                    max: 2
+                    value: 1
+                    step: .05
+                    size_hint_x: None
+                    width: dp(130)
+                    on_value: app.set_selected_clip_volume(self.value)
+
+            MDBoxLayout:
+                id: expanded_panel
+                orientation: "vertical"
+                size_hint_y: None
+                height: dp(62)
+                md_bg_color: "#F0F1F4"
+                MDScrollView:
+                    do_scroll_x: True
+                    do_scroll_y: True
+                    bar_width: dp(3)
+                    MDBoxLayout:
+                        id: expanded_tracks
+                        orientation: "vertical"
+                        adaptive_width: True
+                        adaptive_height: True
+                        spacing: dp(2)

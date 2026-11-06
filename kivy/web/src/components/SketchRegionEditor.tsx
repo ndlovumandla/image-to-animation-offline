@@ -1,0 +1,57 @@
+import { useEffect, useRef, useState } from 'react'
+import type { Point, SketchRegion } from '../engine/types'
+import { createId } from '../engine/id'
+
+interface Props {
+  source: Blob
+  sceneDuration: number
+  initialRegions: SketchRegion[]
+  onCancel(): void
+  onSave(regions: SketchRegion[]): void
+}
+
+const WIDTH=960,HEIGHT=540
+const colors=['#7c3aed','#0891b2','#ea580c','#16a34a','#db2777','#2563eb']
+
+export default function SketchRegionEditor({source,sceneDuration,initialRegions,onCancel,onSave}:Props){
+  const baseRef=useRef<HTMLCanvasElement>(null),overlayRef=useRef<HTMLCanvasElement>(null),imageRef=useRef<HTMLImageElement|null>(null)
+  const [regions,setRegions]=useState<SketchRegion[]>(()=>structuredClone(initialRegions)),[selectedId,setSelectedId]=useState(initialRegions[0]?.id??'')
+  const [brushSize,setBrushSize]=useState(10),[painting,setPainting]=useState(false)
+  const [rect,setRect]=useState({x:0,y:0,width:WIDTH,height:HEIGHT})
+  const selected=regions.find(region=>region.id===selectedId)
+  const total=regions.reduce((sum,region)=>sum+region.duration,0)
+  const maxRegions=Math.max(1,Math.min(20,Math.floor(sceneDuration/.1)))
+  useEffect(()=>{const url=URL.createObjectURL(source),image=new Image();image.onload=()=>{imageRef.current=image;const scale=Math.min(WIDTH/image.naturalWidth,HEIGHT/image.naturalHeight),width=image.naturalWidth*scale,height=image.naturalHeight*scale;setRect({x:(WIDTH-width)/2,y:(HEIGHT-height)/2,width,height});drawBase()};image.src=url;return()=>URL.revokeObjectURL(url)},[source])
+  useEffect(()=>{drawOverlay()},[regions,selectedId,brushSize,rect.x,rect.y,rect.width,rect.height])
+
+  function drawBase(){const canvas=baseRef.current,image=imageRef.current;if(!canvas||!image)return;const context=canvas.getContext('2d')!;const scale=Math.min(WIDTH/image.naturalWidth,HEIGHT/image.naturalHeight),width=image.naturalWidth*scale,height=image.naturalHeight*scale,x=(WIDTH-width)/2,y=(HEIGHT-height)/2;context.clearRect(0,0,WIDTH,HEIGHT);context.fillStyle='#f8fafc';context.fillRect(0,0,WIDTH,HEIGHT);context.globalAlpha=.62;context.drawImage(image,x,y,width,height);context.globalAlpha=1}
+  function drawOverlay(){const canvas=overlayRef.current;if(!canvas)return;const context=canvas.getContext('2d')!;context.clearRect(0,0,WIDTH,HEIGHT);for(const region of regions){context.strokeStyle=region.color;context.fillStyle=region.color;context.globalAlpha=region.id===selectedId?.48:.28;context.lineCap='round';context.lineJoin='round';for(const stroke of region.strokes){const radius=stroke.radius*Math.min(rect.width,rect.height);context.lineWidth=radius*2;if(stroke.points.length===1){const point=toCanvas(stroke.points[0]);context.beginPath();context.arc(point.x,point.y,radius,0,Math.PI*2);context.fill();continue}context.beginPath();const first=toCanvas(stroke.points[0]);context.moveTo(first.x,first.y);for(const point of stroke.points.slice(1)){const mapped=toCanvas(point);context.lineTo(mapped.x,mapped.y)}context.stroke()}}context.globalAlpha=1}
+  const toCanvas=(point:Point)=>({x:rect.x+point.x*rect.width,y:rect.y+point.y*rect.height})
+  const fromEvent=(event:React.PointerEvent<HTMLCanvasElement>):Point|undefined=>{const bounds=event.currentTarget.getBoundingClientRect(),x=(event.clientX-bounds.left)*WIDTH/bounds.width,y=(event.clientY-bounds.top)*HEIGHT/bounds.height;if(x<rect.x||x>rect.x+rect.width||y<rect.y||y>rect.y+rect.height)return;return{x:(x-rect.x)/rect.width,y:(y-rect.y)/rect.height}}
+
+  function beginStroke(event:React.PointerEvent<HTMLCanvasElement>){const point=fromEvent(event);if(!point||!selected)return;event.currentTarget.setPointerCapture(event.pointerId);setPainting(true);const stroke={points:[point],radius:brushSize/100};setRegions(items=>items.map(region=>region.id===selected.id?{...region,strokes:[...region.strokes,stroke]}:region));const move=(native:PointerEvent)=>{const canvas=overlayRef.current;if(!canvas)return;const bounds=canvas.getBoundingClientRect(),x=(native.clientX-bounds.left)*WIDTH/bounds.width,y=(native.clientY-bounds.top)*HEIGHT/bounds.height;if(x<rect.x||x>rect.x+rect.width||y<rect.y||y>rect.y+rect.height)return;const next={x:(x-rect.x)/rect.width,y:(y-rect.y)/rect.height};setRegions(items=>items.map(region=>region.id===selected.id?{...region,strokes:region.strokes.map((item,index)=>index===region.strokes.length-1?{...item,points:[...item.points,next]}:item)}:region))};const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);setPainting(false)};addEventListener('pointermove',move);addEventListener('pointerup',up,{once:true})}
+  function setRegionCount(requested:number){
+    const count=Math.max(0,Math.min(maxRegions,Math.round(requested)||0))
+    setRegions(items=>{
+      const next=items.slice(0,count)
+      while(next.length<count)next.push({id:createId(),name:`Region ${next.length+1}`,duration:sceneDuration/count,color:colors[next.length%colors.length],strokes:[]})
+      const duration=count?sceneDuration/count:0
+      const timed=next.map(region=>({...region,duration}))
+      if(!timed.some(region=>region.id===selectedId))setSelectedId(timed.at(-1)?.id??'')
+      return timed
+    })
+  }
+  function addRegion(){setRegionCount(regions.length+1)}
+  function updateSelected(update:Partial<SketchRegion>){setRegions(items=>items.map(region=>region.id===selectedId?{...region,...update}:region))}
+  function moveSelected(direction:-1|1){setRegions(items=>{const index=items.findIndex(item=>item.id===selectedId),target=index+direction;if(index<0||target<0||target>=items.length)return items;const next=[...items],[item]=next.splice(index,1);next.splice(target,0,item);return next})}
+  function deleteSelected(){setRegions(items=>{const index=items.findIndex(item=>item.id===selectedId),remaining=items.filter(item=>item.id!==selectedId),duration=remaining.length?sceneDuration/remaining.length:0,next=remaining.map(item=>({...item,duration}));setSelectedId(next[Math.min(index,next.length-1)]?.id??'');return next})}
+  function undoStroke(){if(selected?.strokes.length)updateSelected({strokes:selected.strokes.slice(0,-1)})}
+
+  return <div className="fixed inset-0 z-[110] flex flex-col bg-[#eef0f4]">
+    <header className="flex h-14 items-center gap-3 bg-gradient-to-r from-[#121338] to-[#7c3aed] px-4 text-white"><button onClick={onCancel} className="rounded px-3 py-2 hover:bg-white/15">← Cancel</button><strong>Sketch regions</strong><span className="text-sm text-white/70">Paint sections now, then time them on the video timeline</span><div className="ml-auto flex items-center gap-3"><span className="text-xs text-white/75">{regions.length} regions · {total.toFixed(3)}s</span><button disabled={!regions.length} onClick={()=>onSave(regions)} className="rounded bg-white px-4 py-2 font-semibold text-violet-700 disabled:opacity-40">Save regions</button></div></header>
+    <div className="flex min-h-0 flex-1"><aside className="w-72 shrink-0 overflow-y-auto border-r bg-white p-4"><div className="flex items-end gap-2"><label className="flex-1 text-xs font-semibold">Number of regions<input aria-label="Number of sketch regions" type="number" min="1" max={maxRegions} value={regions.length||''} placeholder="Enter a number" onChange={event=>setRegionCount(Number(event.target.value))} className="mt-1 w-full rounded-lg border border-slate-300 p-2"/></label><button aria-label="Add region" disabled={regions.length>=maxRegions} onClick={addRegion} className="rounded bg-violet-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">＋</button></div><p className="mt-2 text-xs leading-5 text-slate-500">Choose how many drawing stages you need. Paint each stage, save, then drag its colored divider on the main timeline.</p><div className="mt-3 space-y-2">{regions.map((region,index)=><button key={region.id} onClick={()=>setSelectedId(region.id)} className={`w-full rounded-lg border p-3 text-left ${region.id===selectedId?'border-violet-600 bg-violet-50':'hover:border-slate-400'}`}><div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{background:region.color}}/><strong className="flex-1 text-xs">{index+1}. {region.name}</strong><span className="text-[10px]">{region.duration.toFixed(3)}s</span></div><span className="mt-1 block text-[10px] text-slate-500">{region.strokes.length} brush stroke{region.strokes.length===1?'':'s'}</span></button>)}</div>{!regions.length&&<div className="mt-5 rounded-xl border-2 border-dashed border-violet-300 p-5 text-center text-sm font-semibold text-violet-700">Enter the number of regions above</div>}</aside>
+      <main className="flex min-w-0 flex-1 flex-col"><div className="flex h-12 items-center gap-3 border-b bg-white px-4"><label className="text-xs font-semibold">Brush size <input aria-label="Region brush size" type="range" min="1" max="30" step="1" value={brushSize} onChange={event=>setBrushSize(Number(event.target.value))} className="ml-2 align-middle"/></label><button disabled={!selected?.strokes.length} onClick={undoStroke} className="rounded bg-slate-100 px-3 py-1.5 text-xs disabled:opacity-40">Undo stroke</button><button disabled={!selected?.strokes.length} onClick={()=>updateSelected({strokes:[]})} className="rounded bg-slate-100 px-3 py-1.5 text-xs disabled:opacity-40">Clear region</button><span className="text-xs text-slate-500">{painting?'Painting…':'Drag over the image to select what this stage sketches.'}</span></div><div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6"><div className="relative overflow-hidden bg-white shadow-2xl"><canvas ref={baseRef} width={WIDTH} height={HEIGHT}/><canvas ref={overlayRef} data-testid="region-paint-canvas" width={WIDTH} height={HEIGHT} onPointerDown={beginStroke} className={`absolute inset-0 h-full w-full ${selected?'cursor-crosshair':'cursor-not-allowed'}`}/></div></div></main>
+      <aside className="w-64 shrink-0 border-l bg-white p-4"><h3 className="font-semibold">Selected stage</h3>{selected?<><label className="mt-4 block text-xs font-semibold">Name<input aria-label="Region name" value={selected.name} onChange={event=>updateSelected({name:event.target.value})} className="mt-1 w-full rounded border p-2"/></label><div className="mt-3 rounded-lg bg-violet-50 p-3 text-xs text-violet-900"><strong>Current share: {selected.duration.toFixed(3)}s</strong><br/>Save the regions, then drag the colored dividers on the video scene to change this timing.</div><label className="mt-3 flex items-center justify-between text-xs font-semibold">Mask color<input aria-label="Region mask color" type="color" value={selected.color} onChange={event=>updateSelected({color:event.target.value})}/></label><div className="mt-4 grid grid-cols-2 gap-2"><button onClick={()=>moveSelected(-1)} className="rounded border p-2 text-xs">Move earlier</button><button onClick={()=>moveSelected(1)} className="rounded border p-2 text-xs">Move later</button></div><button onClick={deleteSelected} className="mt-2 w-full rounded border border-red-200 p-2 text-xs text-red-700">Delete region</button></>:<p className="mt-3 text-xs text-slate-500">Enter a region count, select a region, then paint over the portion to sketch.</p>}<div className="mt-5 rounded-lg bg-cyan-50 p-3 text-xs leading-5 text-cyan-900"><strong>Playback order</strong><br/>The colored sections play from left to right. Dragging a divider gives one region more time and its neighbor less time.</div></aside>
+    </div>
+  </div>
+}

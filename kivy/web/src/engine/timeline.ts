@@ -1,8 +1,10 @@
 import type { AudioClip, Project, Scene } from './types'
+import { createId } from './id'
 
 export const MIN_SCENE_DURATION = 0.5
 export const MIN_CLIP_DURATION = 1 / 1000
 const clamp = (value: number, low: number, high = Number.POSITIVE_INFINITY) => Math.min(high, Math.max(low, value))
+const cloneRegions = (scene: Scene) => scene.sketchRegions.map(region=>({...region,strokes:region.strokes.map(stroke=>({...stroke,points:stroke.points.map(point=>({...point}))}))}))
 
 export function sceneStarts(scenes: readonly Scene[]): number[] {
   const starts: number[] = []; let cursor = 0
@@ -18,8 +20,11 @@ export function resizeScene(project: Project, sceneId: string, duration: number)
   const scene = project.scenes.find((item) => item.id === sceneId)
   if (!scene) throw new Error(`Scene not found: ${sceneId}`)
   scene.duration = Math.max(MIN_SCENE_DURATION, duration)
+  scene.sketchDuration = Math.min(scene.sketchDuration ?? scene.duration, scene.duration)
+  const regionTotal=scene.sketchRegions.reduce((sum,region)=>sum+region.duration,0)
+  if(regionTotal>scene.duration)for(const region of scene.sketchRegions)region.duration=region.duration/regionTotal*scene.duration
 }
-export function splitScene(project: Project, sceneId: string, timelineTime: number, newId: string = crypto.randomUUID()): Scene {
+export function splitScene(project: Project, sceneId: string, timelineTime: number, newId: string = createId()): Scene {
   const index = project.scenes.findIndex((item) => item.id === sceneId)
   if (index < 0) throw new Error(`Scene not found: ${sceneId}`)
   const scene = project.scenes[index]
@@ -28,9 +33,10 @@ export function splitScene(project: Project, sceneId: string, timelineTime: numb
   const rightDuration = scene.duration - leftDuration
   if (leftDuration < MIN_SCENE_DURATION || rightDuration < MIN_SCENE_DURATION) throw new Error('Split must leave at least 0.5 seconds on each side')
   const span = scene.progressEnd - scene.progressStart
-  const splitProgress = scene.progressStart + span * (leftDuration / scene.duration)
-  const right: Scene = { ...scene, id: newId, duration: rightDuration, progressStart: splitProgress }
-  scene.duration = leftDuration; scene.progressEnd = splitProgress
+  const originalSketchDuration=Math.max(.1,Math.min(scene.duration,scene.sketchDuration??scene.duration))
+  const splitProgress = scene.progressStart + span * Math.min(1,leftDuration / originalSketchDuration)
+  const right: Scene = { ...scene, sketchSettings:{...scene.sketchSettings}, sketchRegions:cloneRegions(scene), id: newId, duration: rightDuration, sketchDuration: Math.min(rightDuration,Math.max(.1,originalSketchDuration-leftDuration)), progressStart: splitProgress }
+  scene.duration = leftDuration; scene.sketchDuration=Math.min(leftDuration,originalSketchDuration); scene.progressEnd = splitProgress
   project.scenes.splice(index + 1, 0, right)
   for (const transition of project.transitions) if (transition.fromSceneId === sceneId) transition.fromSceneId = right.id
   return right

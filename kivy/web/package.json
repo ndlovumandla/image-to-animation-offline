@@ -5,15 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --host 127.0.0.1",
+    "dev:lan": "vite --host 0.0.0.0 --port 4173 --strictPort",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
-    ,"background:setup": "python -m pip install -r tools/requirements-background.txt"
-    ,"background:start": "python tools/background_server.py"
+    "test:e2e": "playwright test",
+    "background:setup": "python -m pip install -r tools/requirements-background.txt",
+    "background:start": "python tools/background_server.py"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "6.1.2",
     "fabric": "^7.4.0",
     "idb": "8.0.4",
     "immer": "11.1.21",
@@ -28,10 +29,11 @@
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "6.1.2",
     "ffprobe-static": "3.1.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.4",
-    "vitest": "4.1.11"
+    "vitest": "^4.1.12"
   }
 }

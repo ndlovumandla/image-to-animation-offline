@@ -9,8 +9,9 @@ function wav(frequency: number, seconds = 2, rate = 8000): Buffer { const sample
 
 test('scene timeline resizes, splits, duplicates, reorders, deletes and zooms', async ({ page }) => {
   await page.goto('/'); const input = page.getByTestId('image-input')
-  await input.setInputFiles({ name: 'one.png', mimeType: 'image/png', buffer: await png(page, 0) }); await expect(page.getByTestId('scene-block')).toHaveCount(1)
-  await input.setInputFiles({ name: 'two.png', mimeType: 'image/png', buffer: await png(page, 12) }); await expect(page.getByTestId('scene-block')).toHaveCount(2)
+  await input.setInputFiles({ name: 'one.png', mimeType: 'image/png', buffer: await png(page, 0) }); await page.getByRole('button',{name:'Add one.png to timeline'}).click(); await expect(page.getByTestId('scene-block')).toHaveCount(1)
+  await input.setInputFiles({ name: 'two.png', mimeType: 'image/png', buffer: await png(page, 12) }); await page.getByRole('button',{name:'Add two.png to timeline'}).click(); await expect(page.getByTestId('scene-block')).toHaveCount(2)
+  const sketchHandle=page.getByTestId('sketch-duration-handle').first(),sketchBox=await sketchHandle.boundingBox();if(!sketchBox)throw new Error('Sketch completion handle unavailable');await page.mouse.move(sketchBox.x+sketchBox.width/2,sketchBox.y+sketchBox.height/2);await page.mouse.down();await page.mouse.move(sketchBox.x-155,sketchBox.y+sketchBox.height/2);await page.mouse.up();await expect(sketchHandle).toHaveAttribute('aria-valuenow','2000')
   const firstWidth = await page.getByTestId('scene-block').first().evaluate((element) => element.getBoundingClientRect().width)
   const handle = page.getByTestId('scene-right-handle').first(); await handle.scrollIntoViewIfNeeded(); const box = await handle.boundingBox(); if (!box) throw new Error('Resize handle unavailable')
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.mouse.move(box.x + 85, box.y + box.height / 2); await page.mouse.up()
@@ -23,8 +24,20 @@ test('scene timeline resizes, splits, duplicates, reorders, deletes and zooms', 
   await page.keyboard.press('Control+z'); await expect(page.getByTestId('scene-block')).toHaveCount(4); await page.keyboard.press('Control+Shift+z'); await expect(page.getByTestId('scene-block')).toHaveCount(3)
 })
 
+test('a video scene can be split repeatedly without reselecting each new segment', async ({ page }) => {
+  await page.goto('/'); const input = page.getByTestId('image-input')
+  await input.setInputFiles({ name: 'repeat.png', mimeType: 'image/png', buffer: await png(page, 4) }); await page.getByRole('button',{name:'Add repeat.png to timeline'}).click()
+  await page.getByTestId('scene-block').click()
+  for (const cut of ['1', '2', '3']) {
+    await page.getByLabel('Scrub sketch').fill(cut)
+    await page.getByRole('button', { name: 'Split' }).click()
+  }
+  await expect(page.getByTestId('scene-block')).toHaveCount(4)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
 test('audio clips trim, move across tracks, split and delete', async ({ page }) => {
-  await page.goto('/'); const input = page.getByTestId('audio-input'); await input.setInputFiles({ name: 'one.wav', mimeType: 'audio/wav', buffer: wav(300) }); await input.setInputFiles({ name: 'two.wav', mimeType: 'audio/wav', buffer: wav(500) }); await expect(page.getByTestId('audio-clip')).toHaveCount(2)
+  await page.goto('/'); const input = page.getByTestId('audio-input'); await input.setInputFiles({ name: 'one.wav', mimeType: 'audio/wav', buffer: wav(300) }); await page.getByRole('button',{name:'Add one.wav to timeline'}).click(); await input.setInputFiles({ name: 'two.wav', mimeType: 'audio/wav', buffer: wav(500) }); await page.getByRole('button',{name:'Add two.wav to timeline'}).click(); await expect(page.getByTestId('audio-clip')).toHaveCount(2)
   const right = page.getByTestId('clip-right-handle').first(); await right.scrollIntoViewIfNeeded(); const box = await right.boundingBox(); if (!box) throw new Error('Audio trim handle unavailable'); const width = await page.getByTestId('audio-clip').first().evaluate((element) => element.getBoundingClientRect().width)
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.mouse.move(box.x - 35, box.y + box.height / 2); await page.mouse.up(); await expect.poll(() => page.getByTestId('audio-clip').first().evaluate((element) => element.getBoundingClientRect().width)).toBeLessThan(width - 20)
   const lanes = page.getByTestId('timeline-audio-lane'); await page.getByTestId('clip-drag').first().dragTo(lanes.nth(1), { targetPosition: { x: 400, y: 40 } }); await expect(page.getByTestId('audio-clip')).toHaveCount(2)

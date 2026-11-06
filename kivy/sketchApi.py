@@ -716,6 +716,197 @@ def common_divisors(num1, num2):
     return common_divs
 
 
+def estimate_draw_stage_frames(variables, object_mask=None, skip_rate=5):
+    """Return the exact number of frames written by draw_masked_object for this stage."""
+    n_cuts_vertical = int(math.ceil(variables.resize_ht / variables.split_len))
+    n_cuts_horizontal = int(math.ceil(variables.resize_wd / variables.split_len))
+
+    line_mask = variables.img_thresh.copy()
+    if object_mask is not None:
+        line_mask[object_mask == 0] = 255
+
+    grid_of_lines = np.array(np.split(line_mask, n_cuts_horizontal, axis=-1))
+    grid_of_lines = np.array(np.split(grid_of_lines, n_cuts_vertical, axis=-2))
+
+    has_line = (grid_of_lines < 10) * 1
+    has_line = np.sum(np.sum(has_line, axis=-1), axis=-1)
+    line_indices = np.array(np.where(has_line > 0)).T
+
+    if not variables.draw_color:
+        return 0 if len(line_indices) == 0 else len(line_indices) // max(1, skip_rate)
+
+    img_full_sum = np.sum(variables.img.astype(np.uint32), axis=-1)
+    color_mask = np.zeros_like(variables.img_thresh)
+    color_mask[img_full_sum < 750] = 0
+    color_mask[img_full_sum >= 750] = 255
+    if object_mask is not None:
+        color_mask[object_mask == 0] = 255
+
+    grid_of_colors = np.array(np.split(color_mask, n_cuts_horizontal, axis=-1))
+    grid_of_colors = np.array(np.split(grid_of_colors, n_cuts_vertical, axis=-2))
+
+    has_color = (grid_of_colors < 10) * 1
+    has_color = np.sum(np.sum(has_color, axis=-1), axis=-1)
+    color_indices = np.array(np.where(has_color > 0)).T
+
+    line_set = set(map(tuple, line_indices))
+    fill_indices = np.array([idx for idx in color_indices if tuple(idx) not in line_set])
+
+    fill_skip = max(1, skip_rate * variables.fill_speed_multiplier)
+    lines_written = 0 if len(line_indices) == 0 else len(line_indices) // max(1, skip_rate)
+    fills_written = 0 if len(fill_indices) == 0 else len(fill_indices) // fill_skip
+    return lines_written + fills_written
+
+
+def estimate_video_duration_seconds(
+    image_path,
+    split_len,
+    frame_rate,
+    object_skip_rate,
+    bg_object_skip_rate,
+    main_img_duration,
+    end_color=True,
+    draw_hand=True,
+    max_1080p=True,
+    fill_speed=8,
+    gap_px=4,
+):
+    """Return the exact predicted output length in seconds for the current render settings."""
+    image_bgr = cv2.imread(image_path)
+    if image_bgr is None:
+        return 0.0
+
+    img_ht, img_wd = image_bgr.shape[0], image_bgr.shape[1]
+    if max_1080p and (img_ht > 1920 or img_wd > 1920):
+        if img_wd > img_ht:
+            img_wd = 1920
+            img_ht = 1080
+        else:
+            img_ht = 1920
+            img_wd = 1080
+        image_bgr = resize_with_padding(img=image_bgr, target_width=img_wd, target_height=img_ht)
+    else:
+        aspect_ratio = img_wd / img_ht
+        img_ht = find_nearest_res(img_ht)
+        new_aspect_wd = int(img_ht * aspect_ratio)
+        img_wd = find_nearest_res(new_aspect_wd)
+
+    variables = AllVariables(
+        frame_rate=frame_rate,
+        resize_wd=img_wd,
+        resize_ht=img_ht,
+        split_len=split_len,
+        object_skip_rate=object_skip_rate,
+        bg_object_skip_rate=bg_object_skip_rate,
+        end_gray_img_duration_in_sec=main_img_duration,
+        draw_hand=draw_hand,
+        draw_color=False,
+        two_pass=end_color,
+        fill_speed_multiplier=fill_speed,
+        white_gap_threshold=gap_px,
+        end_color=end_color,
+    )
+    variables = preprocess_image(img=image_bgr, variables=variables)
+
+    total_written_frames = 0
+    if end_color:
+        line_vars = AllVariables(
+            frame_rate=frame_rate,
+            resize_wd=img_wd,
+            resize_ht=img_ht,
+            split_len=split_len,
+            object_skip_rate=object_skip_rate,
+            bg_object_skip_rate=bg_object_skip_rate,
+            end_gray_img_duration_in_sec=main_img_duration,
+            draw_hand=draw_hand,
+            draw_color=False,
+            two_pass=False,
+            fill_speed_multiplier=fill_speed,
+            white_gap_threshold=gap_px,
+            end_color=end_color,
+        )
+        line_vars = preprocess_image(img=image_bgr, variables=line_vars)
+        total_written_frames += estimate_draw_stage_frames(line_vars, object_mask=None, skip_rate=object_skip_rate)
+
+        color_vars = AllVariables(
+            frame_rate=frame_rate,
+            resize_wd=img_wd,
+            resize_ht=img_ht,
+            split_len=split_len,
+            object_skip_rate=object_skip_rate,
+            bg_object_skip_rate=bg_object_skip_rate,
+            end_gray_img_duration_in_sec=main_img_duration,
+            draw_hand=draw_hand,
+            draw_color=True,
+            two_pass=False,
+            fill_speed_multiplier=fill_speed,
+            white_gap_threshold=gap_px,
+            end_color=end_color,
+        )
+        color_vars = preprocess_image(img=image_bgr, variables=color_vars)
+        total_written_frames += estimate_draw_stage_frames(
+            color_vars,
+            object_mask=None,
+            skip_rate=max(1, int(object_skip_rate * 1.5)),
+        )
+    else:
+        total_written_frames += estimate_draw_stage_frames(variables, object_mask=None, skip_rate=object_skip_rate)
+
+    final_hold_frames = max(1, int(frame_rate * max(1, main_img_duration)))
+    total_frames = total_written_frames + final_hold_frames
+    return total_frames / float(frame_rate)
+
+
+def calculate_settings_for_target_duration(
+    image_path,
+    split_len,
+    frame_rate,
+    object_skip_rate,
+    bg_object_skip_rate,
+    main_img_duration,
+    target_duration_seconds,
+    end_color=True,
+    draw_hand=True,
+    max_1080p=True,
+    fill_speed=8,
+    gap_px=4,
+):
+    """Adjust object/background skip and end hold to match a target total-duration in seconds."""
+    target_duration_seconds = float(target_duration_seconds)
+    if target_duration_seconds <= 0:
+        return frame_rate, object_skip_rate, bg_object_skip_rate, main_img_duration
+
+    current_estimate = estimate_video_duration_seconds(
+        image_path=image_path,
+        split_len=split_len,
+        frame_rate=frame_rate,
+        object_skip_rate=object_skip_rate,
+        bg_object_skip_rate=bg_object_skip_rate,
+        main_img_duration=main_img_duration,
+        end_color=end_color,
+        draw_hand=draw_hand,
+        max_1080p=max_1080p,
+        fill_speed=fill_speed,
+        gap_px=gap_px,
+    )
+    if current_estimate <= 0:
+        return frame_rate, object_skip_rate, bg_object_skip_rate, main_img_duration
+
+    ratio = target_duration_seconds / current_estimate
+    new_object_skip_rate = max(1, int(round(object_skip_rate / ratio)))
+    new_bg_object_skip_rate = max(1, int(round(bg_object_skip_rate / ratio)))
+    new_main_img_duration = max(1, int(round(main_img_duration * ratio)))
+
+    if new_object_skip_rate < 1:
+        new_object_skip_rate = 1
+    if new_bg_object_skip_rate < 1:
+        new_bg_object_skip_rate = 1
+    if new_main_img_duration < 1:
+        new_main_img_duration = 1
+
+    return frame_rate, new_object_skip_rate, new_bg_object_skip_rate, new_main_img_duration
+
+
 def ffmpeg_convert(source_vid, dest_vid, platform="linux"):
     ff_stat = False
     try:

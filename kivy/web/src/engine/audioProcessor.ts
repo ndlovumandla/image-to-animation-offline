@@ -2,7 +2,14 @@ import type { WaveformLevel } from './types'
 
 export async function decodeAudio(file: Blob, context: AudioContext): Promise<{ buffer: AudioBuffer; waveform: WaveformLevel[] }> {
   const buffer = await context.decodeAudioData(await file.arrayBuffer())
-  const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => new Float32Array(buffer.getChannelData(index)))
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => {
+    if (typeof buffer.copyFromChannel === 'function') {
+      const copy = new Float32Array(buffer.length)
+      buffer.copyFromChannel(copy, index)
+      return copy
+    }
+    return new Float32Array(buffer.getChannelData(index))
+  })
   const worker = new Worker(new URL('./waveformWorker.ts', import.meta.url), { type: 'module' })
   try {
     const waveform = await new Promise<WaveformLevel[]>((resolve, reject) => {

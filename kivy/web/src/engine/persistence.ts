@@ -1,6 +1,6 @@
 import { openDB, type DBSchema } from 'idb'
 import JSZip from 'jszip'
-import type { Project } from './types'
+import { normalizeProject, type Project } from './types'
 import { blobRegistry } from './blobRegistry'
 import { assetRegistry } from './assetRegistry'
 import { audioRegistry } from './audioRegistry'
@@ -25,7 +25,7 @@ export async function restoreProject(context: AudioContext): Promise<Project | u
     if (asset.kind === 'image') { if (!asset.sketchData) throw new Error(`Missing sketch data: ${asset.name}`); assetRegistry.set(asset.id, { image: await createImageBitmap(blob), sketchData: asset.sketchData }) }
     else { const decoded = await decodeAudio(blob, context); audioRegistry.set(asset.id, decoded.buffer); asset.waveform = decoded.waveform }
   }
-  return project
+  return normalizeProject(project)
 }
 export async function exportProject(project: Project): Promise<Blob> {
   const zip = new JSZip(); zip.file('project.json', JSON.stringify(project)); const folder = zip.folder('assets')!
@@ -37,5 +37,5 @@ export async function importProject(file: Blob, context: AudioContext): Promise<
   if (!project.id || !Array.isArray(project.scenes) || !project.assets) throw new Error('Invalid project document')
   blobRegistry.clear(); assetRegistry.clear(); audioRegistry.clear()
   for (const asset of Object.values(project.assets)) { const zipped = zip.file(`assets/${asset.id}`); if (!zipped) throw new Error(`Project asset is missing: ${asset.name}`); const blob = await zipped.async('blob'); blobRegistry.set(asset.id, blob); if (asset.kind === 'image') { if (!asset.sketchData) throw new Error(`Missing sketch data: ${asset.name}`); assetRegistry.set(asset.id, { image: await createImageBitmap(blob), sketchData: asset.sketchData }) } else { const decoded = await decodeAudio(blob, context); audioRegistry.set(asset.id, decoded.buffer); asset.waveform = decoded.waveform } }
-  await saveProject(project); return project
+  normalizeProject(project); await saveProject(project); return project
 }

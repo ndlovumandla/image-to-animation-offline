@@ -1,0 +1,26 @@
+# =============================================================================
+# Sketch Video Studio — Production Compose Override
+# Usage:
+#   docker compose -f docker/compose.yaml -f docker/compose.prod.yaml up -d
+# Note: Requires the shared `edge_proxy` network created by infrastructure services.
+# Zero host ports are published directly; all traffic enters via Caddy.
+# =============================================================================
+
+services:
+  sketch-web:
+    build:
+      args:
+        VITE_BG_API_BASE: ""
+    networks:
+      - sketch_internal
+      - edge_proxy
+
+  sketch-bg-api:
+    networks:
+      - sketch_internal
+      - edge_proxy
+
+networks:
+  edge_proxy:
+    name: edge_proxy
+    external: true

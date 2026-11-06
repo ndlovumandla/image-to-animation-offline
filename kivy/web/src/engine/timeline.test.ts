@@ -4,10 +4,10 @@ import { defaultSketchSettings, type AudioClip, type Project, type Scene } from 
 import { pxToTime, timeToPx } from './timeScale'
 import { useProjectStore } from '../store/projectStore'
 
-const scene = (id: string, duration: number, progressStart = 0, progressEnd = 1): Scene => ({ id, assetId: `asset-${id}`, duration, progressStart, progressEnd, sketchSettings: defaultSketchSettings() })
+const scene = (id: string, duration: number, progressStart = 0, progressEnd = 1): Scene => ({ id, assetId: `asset-${id}`, duration, sketchDuration: duration, sketchRegions:[], progressStart, progressEnd, sketchSettings: defaultSketchSettings() })
 const clip = (id: string, start: number, sourceIn = 0, sourceOut = 4): AudioClip => ({ id, assetId: 'audio', start, sourceIn, sourceOut, volume: 1, muted: false })
 const project = (): Project => ({
-  id: 'p', name: 'Test', fps: 30, width: 1920, height: 1080, background: '#fff',
+  id: 'p', name: 'Test', fps: 30, width: 1920, height: 1080, background: '#fff', playbackSpeed:1,
   scenes: [scene('a', 2), scene('b', 3), scene('c', 4)], transitions: [],
   audioTracks: [{ id: 't1', name: 'One', muted: false, volume: 1, clips: [] }, { id: 't2', name: 'Two', muted: false, volume: 1, clips: [] }],
   assets: { audio: { id: 'audio', kind: 'audio', blobKey: 'audio', name: 'tone.mp3', meta: { duration: 20 } } },
@@ -26,6 +26,12 @@ describe('magnetic scene timeline', () => {
     expect(value.scenes[0].progressEnd).toBeCloseTo(0.425); expect(right.progressStart).toBeCloseTo(0.425); expect(right.progressEnd).toBe(0.8)
   })
   it('rejects a split that creates an undersized scene', () => expect(() => splitScene(project(), 'a', 0.2)).toThrow(/0.5/))
+  it('can split the newly-created segment repeatedly', () => {
+    const value = project(); const firstRight = splitScene(value, 'a', 1, 'right-1'); const secondRight = splitScene(value, firstRight.id, 1.5, 'right-2')
+    expect(secondRight.id).toBe('right-2')
+    expect(value.scenes.slice(0, 3).map((item) => item.duration)).toEqual([1, .5, .5])
+    expect(value.scenes.slice(0, 3).map((item) => item.id)).toEqual(['a', 'right-1', 'right-2'])
+  })
 })
 
 describe('audio timeline math', () => {
@@ -53,5 +59,28 @@ describe('shared time scale and history', () => {
     useProjectStore.getState().undo(); expect(useProjectStore.getState().project.scenes[0].duration).toBe(2)
     useProjectStore.getState().redo(); expect(useProjectStore.getState().project.scenes[0].duration).toBe(7)
     useProjectStore.getState().undo(); useProjectStore.getState().resizeScene('a', 5); expect(useProjectStore.getState().future).toHaveLength(0)
+  })
+  it('keeps fades only on the outside edges when audio is split', () => {
+    const value=project();value.audioTracks[0].clips.push({...clip('x',0),fadeIn:1,fadeOut:2});useProjectStore.getState().replaceProject(value)
+    const rightId=useProjectStore.getState().splitClip('x',2),clips=useProjectStore.getState().project.audioTracks[0].clips
+    expect(clips.find(item=>item.id==='x')).toMatchObject({fadeIn:1,fadeOut:0,sourceOut:2})
+    expect(clips.find(item=>item.id===rightId)).toMatchObject({fadeIn:0,fadeOut:2,sourceIn:2})
+  })
+  it('toggles sketch animation independently for each scene',()=>{
+    useProjectStore.getState().setSceneSketchEnabled('a',false)
+    expect(useProjectStore.getState().project.scenes[0].sketchSettings.enabled).toBe(false)
+    expect(useProjectStore.getState().project.scenes[1].sketchSettings.enabled).toBe(true)
+    useProjectStore.getState().undo()
+    expect(useProjectStore.getState().project.scenes[0].sketchSettings.enabled).toBe(true)
+  })
+  it('moves a sketch region boundary without changing the combined drawing time',()=>{
+    useProjectStore.getState().setSceneSketchRegions('a',[
+      {id:'r1',name:'Face',duration:1,color:'#7c3aed',strokes:[]},
+      {id:'r2',name:'Board',duration:1,color:'#0891b2',strokes:[]},
+    ])
+    useProjectStore.getState().resizeSketchRegionBoundary('a',0,.35)
+    const regions=useProjectStore.getState().project.scenes[0].sketchRegions
+    expect(regions.map(region=>region.duration)).toEqual([1.35,.65])
+    expect(regions.reduce((sum,region)=>sum+region.duration,0)).toBe(2)
   })
 })

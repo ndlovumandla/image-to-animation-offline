@@ -1,0 +1,85 @@
+# =============================================================================
+# Sketch Video Studio — Base Docker Compose Configuration (docker/compose.yaml)
+# Combine with compose.dev.yaml (local testing) or compose.prod.yaml (production)
+# =============================================================================
+
+name: sketch-studio
+
+services:
+  sketch-web:
+    image: ${REGISTRY_IMAGE_WEB:-sketch-video-studio-web}:${APP_VERSION:-0.1.0}
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_BG_API_BASE: ${VITE_BG_API_BASE:-}
+    container_name: sketch-web
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      sketch-bg-api:
+        condition: service_healthy
+    networks:
+      - sketch_internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  sketch-bg-api:
+    image: ${REGISTRY_IMAGE_BG_API:-sketch-video-studio-bg-api}:${APP_VERSION:-0.1.0}
+    build:
+      context: ..
+      dockerfile: docker/bg-api.Dockerfile
+    container_name: sketch-bg-api
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "7000"
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-20971520}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8880}
+      U2NET_HOME: "/home/appuser/.u2net"
+      OMP_NUM_THREADS: "2"
+    volumes:
+      - u2net_models:/home/appuser/.u2net
+    networks:
+      - sketch_internal
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2048M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  u2net_models:
+    name: sketch_u2net_models
+
+networks:
+  sketch_internal:
+    name: sketch_internal
+    driver: bridge
+    internal: false
