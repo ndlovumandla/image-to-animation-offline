@@ -24,7 +24,7 @@ services:
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       PORTAINER_DOMAIN: ${PORTAINER_DOMAIN:-portainer.localhost}
     ports:
-      - "127.0.0.1:${CADDY_HTTP_PORT:-8880}:80"
+      - "${CADDY_HTTP_PORT:-8880}:80"
     volumes:
       - ../infrastructure/caddy:/etc/caddy:ro
       - caddy_data:/data
@@ -57,8 +57,8 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      # Bound strictly to localhost (never 0.0.0.0) for SSH port-forwarding or local access
-      - "127.0.0.1:9443:9443"
+      # Bound to 9443 for LAN and administrative access
+      - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - portainer_data:/data
