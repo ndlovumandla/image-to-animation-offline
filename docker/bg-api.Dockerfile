@@ -11,9 +11,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY kivy/web/tools/requirements-background.txt /tmp/requirements-background.txt
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip setuptools wheel \
-    && pip install -r /tmp/requirements-background.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r /tmp/requirements-background.txt
 
 # =============================================================================
 # Stage 2: Hardened non-root production runtime
