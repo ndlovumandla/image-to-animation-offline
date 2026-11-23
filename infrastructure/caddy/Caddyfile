@@ -122,10 +122,24 @@ http://{$PORTAINER_DOMAIN:portainer.localhost} {
 }
 
 # =============================================================================
-# 3. Template for Future Applications on the Same Ubuntu Server
+# 3. Chatterbox TTS Server (FastAPI + PyTorch + Web UI)
+# Supports streaming audio chunking (flush_interval -1) and OpenAI-compatible API
 # =============================================================================
-# http://app2.yourdomain.com {
-# 	import security_headers
-# 	import access_log
-# 	reverse_proxy app2-container:3000
-# }
+http://{$CHATTERBOX_DOMAIN:chatterbox.localhost} {
+	import security_headers
+	import access_log
+
+	# Disable proxy buffering to support real-time audio chunk streaming
+	reverse_proxy sketch-chatterbox:8004 {
+		flush_interval -1
+		health_uri /health
+		health_interval 30s
+		health_timeout 5s
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 300s
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+}
