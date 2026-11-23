@@ -87,7 +87,7 @@ jobs:
         run: python -m py_compile pipeline/*.py tests/*.py
 
       - name: Run offline pipeline unit & integration tests
-        run: pytest tests/test_pipeline.py -v
+        run: python -m pytest tests/test_pipeline.py -v
 
   container-security-scan:
     name: Docker Build & Trivy Vulnerability Scan

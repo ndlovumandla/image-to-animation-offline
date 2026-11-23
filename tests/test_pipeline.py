@@ -7,7 +7,12 @@ services required.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import cv2
 import numpy as np
@@ -32,7 +37,6 @@ from pipeline.stage5_animate import (
 )
 from pipeline.web_ui import app
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS_DIR = REPO_ROOT / "pipeline" / "workflows"
 
 
