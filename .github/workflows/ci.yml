@@ -83,8 +83,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r pipeline/requirements.txt pytest httpx
 
-      - name: Compile-check all pipeline modules
-        run: python -m py_compile pipeline/*.py tests/*.py
+      - name: Compile-check all pipeline modules & validate setup.sh
+        run: |
+          bash -n setup.sh
+          python -m py_compile pipeline/*.py tests/*.py
 
       - name: Run offline pipeline unit & integration tests
         run: python -m pytest tests/test_pipeline.py -v

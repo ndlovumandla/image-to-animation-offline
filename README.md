@@ -74,7 +74,28 @@ Because the pipeline automatically **unloads each AI model from GPU memory (VRAM
 
 ---
 
-## Quickstart — Fork & Run Locally (Beginner-Friendly Guide)
+## Quickstart — 1-Click Setup (Beginner-Friendly Guide)
+
+### Fast Path: Run the 1-Click Setup Script
+After cloning your fork (`git clone https://github.com/<YOUR-USERNAME>/image-to-animation-offline.git && cd image-to-animation-offline`):
+
+- **Linux / macOS (1-click install + launch):**
+  ```bash
+  chmod +x setup.sh
+  ./setup.sh --start
+  ```
+  *(Want it to also download Ollama `gemma3:12b` and install ComfyUI + Qwen-Image models automatically? Run `./setup.sh --with-ai --start`!)*
+
+- **Windows 10 / 11 (PowerShell — 1-click install + launch):**
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Start
+  ```
+
+The 1-click script automatically checks Python & FFmpeg, creates `.venv`, installs all dependencies, creates `.env`, verifies your installation, checks whether Ollama / ComfyUI / Chatterbox are online, and opens the Web Studio at **`http://localhost:8090`**.
+
+---
+
+### Manual Step-by-Step Setup (If You Prefer Doing Each Step Yourself)
 
 Follow these 6 steps in order. If you already have Git, Python, and FFmpeg installed, you can skip straight to **Step 2**.
 
