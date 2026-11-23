@@ -57,13 +57,40 @@ if [[ -z "$PYTHON_BIN" ]]; then
   echo "  macOS:         brew install python@3.12"
   exit 1
 fi
-echo "[1/5] Using Python: $PYTHON_BIN ($("$PYTHON_BIN" --version))"
+echo "[1/6] Using Python: $PYTHON_BIN ($("$PYTHON_BIN" --version))"
 
-# 2. Check / install FFmpeg
+# 2. Check NVIDIA GPU, Driver & CUDA (nvidia-smi)
+TORCH_INDEX_URL=""
+if command -v nvidia-smi >/dev/null 2>&1 && GPU_INFO="$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null | head -n 1)" && [[ -n "$GPU_INFO" ]]; then
+  CUDA_VER="$(nvidia-smi 2>/dev/null | sed -n 's/.*CUDA Version: \([0-9][0-9.]*\).*/\1/p' | head -n 1 || true)"
+  VRAM_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -n 1 | tr -d ' ' || echo 0)"
+  echo "[2/6] NVIDIA GPU detected: $GPU_INFO (CUDA ${CUDA_VER:-unknown})"
+  if [[ "$VRAM_MIB" =~ ^[0-9]+$ && "$VRAM_MIB" -lt 12000 ]]; then
+    echo "      [WARN] Detected ${VRAM_MIB} MiB VRAM; 12–16 GB VRAM is recommended for local Qwen-Image + gemma3:12b."
+  fi
+  if [[ "${CUDA_VER:-}" == 13.* ]]; then
+    TORCH_INDEX_URL="https://download.pytorch.org/whl/cu130"
+  elif [[ "${CUDA_VER:-}" == 12.8* || "${CUDA_VER:-}" == 12.9* ]]; then
+    TORCH_INDEX_URL="https://download.pytorch.org/whl/cu128"
+  elif [[ "${CUDA_VER:-}" == 12.* ]]; then
+    TORCH_INDEX_URL="https://download.pytorch.org/whl/cu124"
+  fi
+  if command -v nvcc >/dev/null 2>&1; then
+    echo "      CUDA Toolkit (nvcc): $(nvcc --version | tail -n 1)"
+  else
+    echo "      [INFO] nvcc toolkit not on PATH (optional — NVIDIA driver + nvidia-smi is sufficient for prebuilt PyTorch/Ollama/ComfyUI)."
+  fi
+else
+  echo "[2/6] [WARN] nvidia-smi not found or NVIDIA GPU driver not active."
+  echo "      - To run local AI on an NVIDIA GPU (Ubuntu): sudo ubuntu-drivers install && sudo reboot"
+  echo "      - Or set SKETCH_GPU_HOST=<your-gpu-server-ip> in .env to use a remote GPU server."
+fi
+
+# 3. Check / install FFmpeg
 if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
-  echo "[2/5] FFmpeg found: $(ffmpeg -version | head -n 1)"
+  echo "[3/6] FFmpeg found: $(ffmpeg -version | head -n 1)"
 elif [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
-  echo "[2/5] FFmpeg not found — installing static FFmpeg into ~/.local/bin (no sudo required)..."
+  echo "[3/6] FFmpeg not found — installing static FFmpeg into ~/.local/bin (no sudo required)..."
   TMP_FF="$(mktemp -d)"
   curl -L --progress-bar https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o "$TMP_FF/ffmpeg.tar.xz"
   tar -xf "$TMP_FF/ffmpeg.tar.xz" -C "$TMP_FF"
@@ -73,24 +100,24 @@ elif [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
   rm -rf "$TMP_FF"
   echo "      Installed: $(ffmpeg -version | head -n 1)"
 else
-  echo "[WARN] FFmpeg/FFprobe not found on PATH. Please install FFmpeg:"
-  echo "       macOS: brew install ffmpeg | Ubuntu: sudo apt install -y ffmpeg"
+  echo "[3/6] [WARN] FFmpeg/FFprobe not found on PATH. Please install FFmpeg:"
+  echo "      macOS: brew install ffmpeg | Ubuntu: sudo apt install -y ffmpeg"
 fi
 
-# 3. Create .venv & install Studio dependencies
-echo "[3/5] Setting up virtual environment (.venv) and installing dependencies..."
+# 4. Create .venv & install Studio dependencies
+echo "[4/6] Setting up virtual environment (.venv) and installing dependencies..."
 if [[ ! -d "$REPO_DIR/.venv" ]]; then
   "$PYTHON_BIN" -m venv "$REPO_DIR/.venv"
 fi
 "$REPO_DIR/.venv/bin/python" -m pip install --upgrade pip -q
 "$REPO_DIR/.venv/bin/pip" install -r "$REPO_DIR/pipeline/requirements.txt"
 
-# 4. Create .env from template if missing
+# 5. Create .env from template if missing
 if [[ ! -f "$REPO_DIR/.env" && -f "$REPO_DIR/.env.example" ]]; then
   cp "$REPO_DIR/.env.example" "$REPO_DIR/.env"
-  echo "[4/5] Created .env from .env.example (defaults to 127.0.0.1)"
+  echo "[5/6] Created .env from .env.example (defaults to 127.0.0.1)"
 else
-  echo "[4/5] Using existing .env configuration"
+  echo "[5/6] Using existing .env configuration"
 fi
 
 # Optional: Install Local AI Stack (--with-ai)
@@ -112,7 +139,12 @@ if [[ "$WITH_AI" == "true" ]]; then
   if [[ ! -d "$COMFY_DIR/.venv" ]]; then
     "$PYTHON_BIN" -m venv "$COMFY_DIR/.venv"
     "$COMFY_DIR/.venv/bin/pip" install --upgrade pip
-    "$COMFY_DIR/.venv/bin/pip" install torch torchvision torchaudio
+    if [[ -n "$TORCH_INDEX_URL" ]]; then
+      echo "     Installing PyTorch CUDA wheels from $TORCH_INDEX_URL ..."
+      "$COMFY_DIR/.venv/bin/pip" install torch torchvision torchaudio --index-url "$TORCH_INDEX_URL"
+    else
+      "$COMFY_DIR/.venv/bin/pip" install torch torchvision torchaudio
+    fi
     "$COMFY_DIR/.venv/bin/pip" install -r "$COMFY_DIR/requirements.txt"
   fi
 
@@ -146,8 +178,8 @@ if [[ "$WITH_AI" == "true" ]]; then
     "$COMFY_DIR/models/loras/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors"
 fi
 
-# 5. Self-check & Service Status
-echo "[5/5] Verifying Studio installation..."
+# 6. Self-check & Service Status
+echo "[6/6] Verifying Studio installation..."
 "$REPO_DIR/.venv/bin/python" -c "from pipeline.web_ui import app; from pipeline.config import PipelineConfig; print('      Studio import OK! Default GPU host:', PipelineConfig().gpu_host)"
 
 GPU_HOST="${SKETCH_GPU_HOST:-127.0.0.1}"
