@@ -57,63 +57,159 @@ Each GPU stage automatically **unloads its VRAM** when finished, allowing the en
 
 ---
 
-## Quickstart — Fork & Run Locally
+## System Requirements
 
-### Prerequisites
-- **Python 3.11 or 3.12**
-- **FFmpeg & FFprobe** installed and available on your `PATH`
-- **Local AI Services** (for full 6-stage video generation; runs on `127.0.0.1` by default):
-  - **Ollama** (`http://127.0.0.1:11434`) with `ollama pull gemma3:12b`
-  - **ComfyUI** (`http://127.0.0.1:8188`) with Qwen-Image FP8/INT8 + Lightning LoRA
-  - **Chatterbox TTS Server** (`http://127.0.0.1:8004`)
-  - *(Ubuntu GPU server helper script included at `pipeline/setup_gpu_server.sh`)*
+Because the pipeline automatically **unloads each AI model from GPU memory (VRAM)** before starting the next stage, you do **not** need a datacenter GPU — a single 16 GB consumer GPU runs the entire 6-stage studio end-to-end.
 
-### 1. Fork & Clone
+| Component | Minimum (Full 6-Stage AI Studio) | Recommended (Fast Production) | Standalone Kivy Image-to-Sketch App Only |
+| :--- | :--- | :--- | :--- |
+| **Operating System** | Ubuntu 22.04/24.04, Windows 10/11, or macOS | Ubuntu 22.04/24.04 LTS (native CUDA) | Windows, Linux, macOS, or Android |
+| **GPU & VRAM** | NVIDIA GPU with **12–16 GB VRAM** (CUDA 12.1+) | NVIDIA RTX 4060 Ti 16 GB / **RTX 5060 Ti 16 GB** / RTX 4080+ | Any GPU or **CPU only** (no AI needed) |
+| **System RAM** | 16 GB RAM | **32 GB RAM** | 4 GB RAM |
+| **Free Disk Space** | ~40 GB (for local AI models + outputs) | **60+ GB SSD** | < 1 GB |
+| **CPU** | 4+ cores | 8+ cores (speeds up Stage 5 parallel animation) | Dual-core+ |
+| **Software** | Python 3.11 or 3.12, Git, FFmpeg & FFprobe | Python 3.12, Git, FFmpeg, NVIDIA drivers | Python 3.11/3.12 |
+
+> **No GPU?** You can still run the **Standalone Kivy Desktop App** (turns any existing image into a hand-drawn whiteboard video on CPU) and the **offline test suite** (`pytest`) on any normal laptop.
+
+---
+
+## Quickstart — Fork & Run Locally (Beginner-Friendly Guide)
+
+Follow these 6 steps in order. If you already have Git, Python, and FFmpeg installed, you can skip straight to **Step 2**.
+
+### Step 1: Install Base Tools (Git, Python 3.12, FFmpeg)
+
+<details open>
+<summary><strong>Ubuntu / Debian Linux</strong></summary>
+
 ```bash
-git clone https://github.com/ndlovumandla/image-to-animation-offline.git
+sudo apt update
+sudo apt install -y git python3.12 python3.12-venv python3-pip ffmpeg curl
+```
+</details>
+
+<details>
+<summary><strong>Windows 10 / 11 (PowerShell)</strong></summary>
+
+```powershell
+winget install Git.Git
+winget install Python.Python.3.12
+winget install Gyan.FFmpeg
+```
+*(Close and reopen PowerShell after installing so `git`, `python`, and `ffmpeg` are on your `PATH`.)*
+</details>
+
+<details>
+<summary><strong>macOS (Homebrew)</strong></summary>
+
+```bash
+brew install git python@3.12 ffmpeg
+```
+</details>
+
+Verify they work:
+```bash
+git --version && python3 --version && ffmpeg -version | head -n 1
+```
+
+---
+
+### Step 2: Fork & Clone This Repository
+1. Click the **Fork** button at the top-right of this GitHub page to copy the repo to your own GitHub account.
+2. Clone your fork to your computer:
+```bash
+git clone https://github.com/<YOUR-GITHUB-USERNAME>/image-to-animation-offline.git
 cd image-to-animation-offline
 ```
 
-### 2. Create Virtual Environment & Install Dependencies
-```bash
-python -m venv .venv
+---
 
+### Step 3: Install the Video Studio Python Dependencies
+Create an isolated virtual environment so nothing conflicts with your system Python:
+```bash
+python3 -m venv .venv
+
+# Activate it:
 # Linux / macOS:
 source .venv/bin/activate
 # Windows (PowerShell):
 .\.venv\Scripts\Activate.ps1
 
+# Install all Studio & Pipeline dependencies:
 pip install --upgrade pip
 pip install -r pipeline/requirements.txt
 ```
 
-### 3. Configure Environment Variables (Optional)
-Copy `.env.example` to `.env` if your AI services run on a different machine or custom ports. By default, everything connects to `127.0.0.1`:
+---
+
+### Step 4: Start the 3 Local AI Services (One-Time Setup)
+The studio talks to three local AI servers on your machine (`127.0.0.1` by default). Keep each one running in its own terminal (or as a background service):
+
+1. **Ollama (Creative Director + Vision Quality Inspector — port `11434`)**
+   - Install from [ollama.com](https://ollama.com/download) (or on Linux: `curl -fsSL https://ollama.com/install.sh | sh`).
+   - Download the vision + text model:
+     ```bash
+     ollama pull gemma3:12b
+     ```
+2. **ComfyUI (Scene Illustrator — port `8188`)**
+   - Clone [ComfyUI](https://github.com/comfyanonymous/ComfyUI) and install its requirements, then place the Qwen-Image models in ComfyUI's `models/` folders:
+     - `models/diffusion_models/qwen_image_fp8_e4m3fn.safetensors`
+     - `models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors`
+     - `models/vae/qwen_image_vae.safetensors`
+     - `models/loras/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors` *(for fast 8-step generation)*
+   - Start ComfyUI with low-VRAM offloading enabled:
+     ```bash
+     python main.py --listen 0.0.0.0 --port 8188 --lowvram
+     ```
+   - *(On Ubuntu, you can also inspect `pipeline/setup_gpu_server.sh` for a reference server setup.)*
+3. **Chatterbox TTS Server (Voiceover Narrator — port `8004`)**
+   - Run [Chatterbox TTS Server](https://github.com/devnen/Chatterbox-TTS-Server) on port `8004` (`http://127.0.0.1:8004`).
+
+---
+
+### Step 5: Verify All 3 Local AI Services Are Ready
+Run this quick check before opening the Studio:
+```bash
+curl -s http://127.0.0.1:11434/api/tags | head -c 120 && echo ""
+curl -s -o /dev/null -w "ComfyUI HTTP: %{http_code}\n" http://127.0.0.1:8188/system_stats
+curl -s http://127.0.0.1:8004/health && echo ""
+```
+You should see `gemma3:12b` listed by Ollama, `ComfyUI HTTP: 200`, and `{"status":"healthy",...}` from Chatterbox.
+
+*(Optional)* If your AI services run on a separate GPU server on your network instead of `127.0.0.1`, copy `.env.example` to `.env` or set `SKETCH_GPU_HOST`:
 ```bash
 cp .env.example .env
+# Example: export SKETCH_GPU_HOST=192.168.1.50
 ```
 
-Key environment variables:
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `SKETCH_GPU_HOST` | `127.0.0.1` | Hostname or IP running Chatterbox, Ollama, and ComfyUI |
 | `CHATTERBOX_URL` | `http://127.0.0.1:8004` | Chatterbox TTS API URL |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama API URL |
 | `COMFYUI_URL` | `http://127.0.0.1:8188` | ComfyUI API URL |
-| `SKETCH_RUNS_DIR` | `./runs` | Directory where generated projects and MP4s are saved |
+| `SKETCH_RUNS_DIR` | `./runs` | Folder where generated projects and MP4 videos are saved |
 | `FFMPEG_BIN` | `ffmpeg` | Path to `ffmpeg` executable |
 | `FFPROBE_BIN` | `ffprobe` | Path to `ffprobe` executable |
 
-### 4. Launch the Web Studio UI
+---
+
+### Step 6: Launch the Web Studio UI & Create Your First Video!
+Make sure your `.venv` is activated, then run:
 ```bash
 uvicorn pipeline.web_ui:app --host 0.0.0.0 --port 8090
 ```
 Open **`http://localhost:8090`** in your browser:
-1. Paste your training or explainer script.
-2. Pick a **Chatterbox Voice** (preview it directly in the UI) and choose a **Presenter Character**, **Environment**, and **Banner Palette**.
-3. Click **Generate Video** — watch scenes appear live, click **Re-roll** on any slide you want regenerated, then click **Approve & Animate** to render the final 1080p MP4.
+1. **Paste your script** into the script box (even a short 3-sentence paragraph is great for your first test).
+2. **Pick a Voice** in *Chatterbox Voice & Audio Controls* and click **Preview Voice** to hear it.
+3. **Pick a Presenter Character, Environment, and Banner Palette** (24 built-in presets).
+4. Click **Generate Video**:
+   - Watch each scene appear live as ComfyUI generates and `gemma3:12b` inspects it.
+   - Click **Re-roll** on any slide you want regenerated.
+   - Click **Approve & Animate** to draw every scene with the whiteboard hand and export your final 1080p MP4!
 
-### 5. Or Run via Command Line (CLI)
+#### Alternative: Run via Command Line (CLI)
 ```bash
 python -m pipeline.run_pipeline \
   --script my_script.txt \
@@ -124,6 +220,18 @@ python -m pipeline.run_pipeline \
   --burn-captions
 ```
 Supports crash-safe resume with `--from-stage N --to-stage M` (`1` through `6`).
+
+---
+
+### Beginner Troubleshooting
+
+| Problem | Quick Fix |
+| :--- | :--- |
+| `ffmpeg: command not found` | Install FFmpeg (Step 1) and restart your terminal, or set `FFMPEG_BIN=/full/path/to/ffmpeg`. |
+| `Address already in use` on port `8090` | Another app is using port 8090 — launch with `--port 8091` instead. |
+| `Connection refused` to port `8004`, `8188`, or `11434` | One of the 3 local AI services isn't running yet. Re-run the Step 5 `curl` check to see which one is offline. |
+| GPU runs out of memory (CUDA OOM) | Make sure ComfyUI was started with `--lowvram`, and verify no other heavy GPU app is holding VRAM open. |
+| `ModuleNotFoundError: No module named 'pipeline'` | Run commands from the repository root folder (`image-to-animation-offline/`) with your `.venv` activated. |
 
 ---
 
@@ -141,7 +249,7 @@ python main.py
 The test suite runs **100% offline without a GPU or external AI services**, validating configuration, character presets, prompt compilation, workflow JSONs, whole-object animation rendering, and FastAPI Web Studio endpoints:
 ```bash
 pip install pytest httpx
-pytest tests/test_pipeline.py -v
+python -m pytest tests/test_pipeline.py -v
 ```
 
 ---
