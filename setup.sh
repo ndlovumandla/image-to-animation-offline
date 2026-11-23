@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AI Explainer & Whiteboard Sketch Studio — 1-Click Setup (Linux / macOS)
+# AI Explainer & Whiteboard Sketch Studio — 1-Click Setup (Ubuntu / Linux / macOS)
 #
 # Usage:
-#   ./setup.sh                # Setup Python .venv, FFmpeg check, .env & self-test
-#   ./setup.sh --start        # Setup + immediately launch Web Studio on :8090
-#   ./setup.sh --with-ai      # Also pull Ollama gemma3:12b & install ComfyUI + Qwen-Image
-#   ./setup.sh --with-ai --start
+#   ./setup.sh                  # Install Studio (.venv, FFmpeg, .env) & check GPU/services
+#   ./setup.sh --start          # Setup Studio + launch Web UI on :8090
+#   ./setup.sh --with-ai        # Full bare-metal install: Ollama + gemma3:12b, ComfyUI + Qwen-Image, Chatterbox TTS
+#   ./setup.sh --with-ai --start # Full install + start all AI services & Web Studio UI
 # =============================================================================
 set -euo pipefail
 
@@ -39,7 +39,20 @@ echo "======================================================================"
 echo "  AI Explainer & Whiteboard Sketch Studio — 1-Click Setup"
 echo "======================================================================"
 
-# 1. Pick Python 3.11 or 3.12
+# 0. On fresh Ubuntu/Debian with sudo, ensure git, curl, python3-venv, and OpenCV libs exist
+if [[ "$(uname -s)" == "Linux" ]] && command -v apt-get >/dev/null 2>&1; then
+  MISSING_PKGS=()
+  command -v git  >/dev/null 2>&1 || MISSING_PKGS+=(git)
+  command -v curl >/dev/null 2>&1 || MISSING_PKGS+=(curl)
+  command -v python3 >/dev/null 2>&1 || MISSING_PKGS+=(python3 python3-venv python3-pip)
+  if [[ ${#MISSING_PKGS[@]} -gt 0 ]] && command -v sudo >/dev/null 2>&1; then
+    echo "[0/6] Installing missing system packages: ${MISSING_PKGS[*]} ..."
+    sudo apt-get update -qq
+    sudo apt-get install -y "${MISSING_PKGS[@]}"
+  fi
+fi
+
+# 1. Pick Python 3.11+
 PYTHON_BIN=""
 for cand in python3.12 python3.11 python3; do
   if command -v "$cand" >/dev/null 2>&1; then
@@ -52,7 +65,7 @@ for cand in python3.12 python3.11 python3; do
 done
 
 if [[ -z "$PYTHON_BIN" ]]; then
-  echo "[ERROR] Python 3.11+ is required but was not found."
+  echo "[ERROR] Python 3.11+ is required."
   echo "  Ubuntu/Debian: sudo apt update && sudo apt install -y python3.12 python3.12-venv python3-pip"
   echo "  macOS:         brew install python@3.12"
   exit 1
@@ -66,7 +79,7 @@ if command -v nvidia-smi >/dev/null 2>&1 && GPU_INFO="$(nvidia-smi --query-gpu=n
   VRAM_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -n 1 | tr -d ' ' || echo 0)"
   echo "[2/6] NVIDIA GPU detected: $GPU_INFO (CUDA ${CUDA_VER:-unknown})"
   if [[ "$VRAM_MIB" =~ ^[0-9]+$ && "$VRAM_MIB" -lt 12000 ]]; then
-    echo "      [WARN] Detected ${VRAM_MIB} MiB VRAM; 12–16 GB VRAM is recommended for local Qwen-Image + gemma3:12b."
+    echo "      [WARN] Detected ${VRAM_MIB} MiB VRAM; 12-16 GB VRAM is recommended for local Qwen-Image + gemma3:12b."
   fi
   if [[ "${CUDA_VER:-}" == 13.* ]]; then
     TORCH_INDEX_URL="https://download.pytorch.org/whl/cu130"
@@ -77,20 +90,18 @@ if command -v nvidia-smi >/dev/null 2>&1 && GPU_INFO="$(nvidia-smi --query-gpu=n
   fi
   if command -v nvcc >/dev/null 2>&1; then
     echo "      CUDA Toolkit (nvcc): $(nvcc --version | tail -n 1)"
-  else
-    echo "      [INFO] nvcc toolkit not on PATH (optional — NVIDIA driver + nvidia-smi is sufficient for prebuilt PyTorch/Ollama/ComfyUI)."
   fi
 else
   echo "[2/6] [WARN] nvidia-smi not found or NVIDIA GPU driver not active."
-  echo "      - To run local AI on an NVIDIA GPU (Ubuntu): sudo ubuntu-drivers install && sudo reboot"
-  echo "      - Or set SKETCH_GPU_HOST=<your-gpu-server-ip> in .env to use a remote GPU server."
+  echo "      - Fresh Ubuntu Server with NVIDIA GPU? Run: sudo ubuntu-drivers install && sudo reboot"
+  echo "      - Or set SKETCH_GPU_HOST=<remote-gpu-ip> in .env to use a remote GPU server."
 fi
 
 # 3. Check / install FFmpeg
 if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
   echo "[3/6] FFmpeg found: $(ffmpeg -version | head -n 1)"
 elif [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
-  echo "[3/6] FFmpeg not found — installing static FFmpeg into ~/.local/bin (no sudo required)..."
+  echo "[3/6] Installing static FFmpeg into ~/.local/bin (no sudo required)..."
   TMP_FF="$(mktemp -d)"
   curl -L --progress-bar https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o "$TMP_FF/ffmpeg.tar.xz"
   tar -xf "$TMP_FF/ffmpeg.tar.xz" -C "$TMP_FF"
@@ -100,12 +111,11 @@ elif [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
   rm -rf "$TMP_FF"
   echo "      Installed: $(ffmpeg -version | head -n 1)"
 else
-  echo "[3/6] [WARN] FFmpeg/FFprobe not found on PATH. Please install FFmpeg:"
-  echo "      macOS: brew install ffmpeg | Ubuntu: sudo apt install -y ffmpeg"
+  echo "[3/6] [WARN] FFmpeg not found. Install via: brew install ffmpeg (macOS) or sudo apt install -y ffmpeg (Ubuntu)."
 fi
 
-# 4. Create .venv & install Studio dependencies
-echo "[4/6] Setting up virtual environment (.venv) and installing dependencies..."
+# 4. Create Studio .venv & install dependencies
+echo "[4/6] Setting up virtual environment (.venv) and installing Studio dependencies..."
 if [[ ! -d "$REPO_DIR/.venv" ]]; then
   "$PYTHON_BIN" -m venv "$REPO_DIR/.venv"
 fi
@@ -120,27 +130,31 @@ else
   echo "[5/6] Using existing .env configuration"
 fi
 
-# Optional: Install Local AI Stack (--with-ai)
+# Optional: Full Local AI Stack (--with-ai)
+COMFY_DIR="${COMFYUI_DIR:-$HOME/ComfyUI}"
+CHATTERBOX_DIR="${CHATTERBOX_DIR:-$HOME/Chatterbox}"
+
 if [[ "$WITH_AI" == "true" ]]; then
   echo ""
-  echo "[AI] Setting up Local AI Services (Ollama gemma3:12b + ComfyUI Qwen-Image)..."
-  if command -v ollama >/dev/null 2>&1; then
-    echo "     Pulling Ollama gemma3:12b..."
-    ollama pull gemma3:12b || echo "[WARN] Could not pull gemma3:12b (is 'ollama serve' running?)"
-  else
-    echo "[WARN] Ollama not installed. Install with: curl -fsSL https://ollama.com/install.sh | sh"
+  echo "[AI 1/3] Setting up Ollama + gemma3:12b ..."
+  if ! command -v ollama >/dev/null 2>&1; then
+    echo "         Installing Ollama..."
+    curl -fsSL https://ollama.com/install.sh | sh
   fi
+  if ! curl -fsS --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    nohup ollama serve > "$HOME/ollama.log" 2>&1 < /dev/null &
+    sleep 3
+  fi
+  ollama pull gemma3:12b
 
-  COMFY_DIR="${COMFYUI_DIR:-$HOME/ComfyUI}"
+  echo "[AI 2/3] Setting up ComfyUI + Qwen-Image models in $COMFY_DIR ..."
   if [[ ! -d "$COMFY_DIR" ]]; then
-    echo "     Cloning ComfyUI into $COMFY_DIR..."
     git clone https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
   fi
   if [[ ! -d "$COMFY_DIR/.venv" ]]; then
     "$PYTHON_BIN" -m venv "$COMFY_DIR/.venv"
-    "$COMFY_DIR/.venv/bin/pip" install --upgrade pip
+    "$COMFY_DIR/.venv/bin/pip" install --upgrade pip -q
     if [[ -n "$TORCH_INDEX_URL" ]]; then
-      echo "     Installing PyTorch CUDA wheels from $TORCH_INDEX_URL ..."
       "$COMFY_DIR/.venv/bin/pip" install torch torchvision torchaudio --index-url "$TORCH_INDEX_URL"
     else
       "$COMFY_DIR/.venv/bin/pip" install torch torchvision torchaudio
@@ -157,10 +171,10 @@ if [[ "$WITH_AI" == "true" ]]; then
     local url="$1"
     local dest="$2"
     if [[ ! -f "$dest" ]]; then
-      echo "     Downloading $(basename "$dest")..."
+      echo "         Downloading $(basename "$dest")..."
       curl -L --progress-bar -C - "$url" -o "$dest"
     else
-      echo "     Already exists: $(basename "$dest")"
+      echo "         Already exists: $(basename "$dest")"
     fi
   }
 
@@ -176,6 +190,36 @@ if [[ "$WITH_AI" == "true" ]]; then
   download_if_missing \
     "https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors" \
     "$COMFY_DIR/models/loras/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors"
+
+  echo "[AI 3/3] Setting up Chatterbox TTS Server in $CHATTERBOX_DIR ..."
+  if [[ ! -d "$CHATTERBOX_DIR" ]]; then
+    git clone https://github.com/devnen/Chatterbox-TTS-Server.git "$CHATTERBOX_DIR"
+  fi
+  if [[ ! -d "$CHATTERBOX_DIR/.venv" ]]; then
+    "$PYTHON_BIN" -m venv "$CHATTERBOX_DIR/.venv"
+    "$CHATTERBOX_DIR/.venv/bin/pip" install --upgrade pip -q
+    if [[ -n "$TORCH_INDEX_URL" ]]; then
+      "$CHATTERBOX_DIR/.venv/bin/pip" install torch torchvision torchaudio --index-url "$TORCH_INDEX_URL"
+    else
+      "$CHATTERBOX_DIR/.venv/bin/pip" install torch torchvision torchaudio
+    fi
+    if [[ -f "$CHATTERBOX_DIR/requirements.txt" ]]; then
+      "$CHATTERBOX_DIR/.venv/bin/pip" install -r "$CHATTERBOX_DIR/requirements.txt"
+    fi
+  fi
+
+  # Start background AI services if --start was requested
+  if [[ "$AUTO_START" == "true" ]]; then
+    if ! curl -fsS --max-time 2 http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then
+      echo "         Starting ComfyUI on :8188 (--lowvram)..."
+      nohup "$COMFY_DIR/.venv/bin/python" "$COMFY_DIR/main.py" --listen 0.0.0.0 --port 8188 --lowvram > "$COMFY_DIR/comfyui.log" 2>&1 < /dev/null &
+    fi
+    if ! curl -fsS --max-time 2 http://127.0.0.1:8004/health >/dev/null 2>&1; then
+      echo "         Starting Chatterbox TTS on :8004..."
+      (cd "$CHATTERBOX_DIR" && nohup "$CHATTERBOX_DIR/.venv/bin/python" server.py > "$CHATTERBOX_DIR/chatterbox.log" 2>&1 < /dev/null &)
+    fi
+    sleep 4
+  fi
 fi
 
 # 6. Self-check & Service Status
