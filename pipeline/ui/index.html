@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Explainer &amp; Whiteboard Sketch Studio</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #0b1220; --border: #334155;
+    --text: #f1f5f9; --muted: #94a3b8; --accent: #38bdf8; --accent-2: #22c55e;
+    --warn: #f59e0b; --danger: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  .badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #0f172a; border: 1px solid var(--border); color: var(--muted); }
+  .badge strong { color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 57px); }
+  aside { background: var(--panel-2); border-right: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 8px 0 4px; }
+  .job-item {
+    padding: 10px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border);
+    cursor: pointer; transition: border-color .15s;
+  }
+  .job-item:hover, .job-item.active { border-color: var(--accent); }
+  .job-item .name { font-weight: 600; font-size: 14px; margin-bottom: 4px; word-break: break-word; }
+  .job-item .meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+  main { padding: 24px; max-width: 1320px; width: 100%; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 16px; }
+  .card h3 { margin: 14px 0 8px; font-size: 14px; color: var(--accent); }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  input[type="text"], select, textarea {
+    width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px; font-size: 13px; font-family: inherit;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  textarea { min-height: 140px; resize: vertical; line-height: 1.5; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 12px; }
+  .checks label { display: flex; align-items: center; gap: 8px; color: var(--text); margin: 0; cursor: pointer; font-size: 13px; }
+  .btn {
+    border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; font-size: 13px;
+    cursor: pointer; background: var(--accent); color: #0b1220; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .9; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-green { background: var(--accent-2); color: #052e16; }
+  .btn-secondary { background: #334155; color: var(--text); }
+  .btn-sm { padding: 6px 11px; font-size: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .progress-wrap { height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin: 12px 0; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0%; transition: width .35s; }
+  .logs {
+    background: #020617; border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #cbd5e1;
+    max-height: 210px; overflow-y: auto; white-space: pre-wrap;
+  }
+  .char-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px;
+    max-height: 290px; overflow-y: auto; padding: 4px; margin-top: 10px;
+  }
+  .char-card {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px;
+    cursor: pointer; transition: border-color .15s, background .15s; display: flex; flex-direction: column; gap: 5px;
+  }
+  .char-card:hover { border-color: var(--accent); }
+  .char-card.selected { border-color: var(--accent-2); background: #0c231c; }
+  .char-card .cname { font-weight: 700; font-size: 13px; }
+  .char-card .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag { font-size: 10px; padding: 2px 6px; border-radius: 999px; background: #1e293b; color: #cbd5e1; }
+  .char-card .desc { font-size: 11px; color: var(--muted); line-height: 1.35; }
+  .scenes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .scene-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .scene-card img { width: 100%; aspect-ratio: 16/9; object-fit: contain; background: #fff; }
+  .scene-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .scene-body textarea { min-height: 82px; font-size: 12px; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .pill-running { background: #0c4a6e; color: #7dd3fc; }
+  .pill-review { background: #78350f; color: #fde68a; }
+  .pill-done { background: #14532d; color: #86efac; }
+  .pill-error { background: #7f1d1d; color: #fecaca; }
+  video { width: 100%; max-height: 540px; border-radius: 10px; background: #000; }
+  .slider-val { float: right; color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Explainer &amp; Whiteboard Sketch Studio</h1>
+  <div class="row">
+    <span class="badge" id="vramBadge">GPU: <strong>Loading...</strong></span>
+    <button class="btn btn-sm" onclick="showNewProject()">+ New Script</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>Projects</h2>
+    <div id="jobsList"></div>
+  </aside>
+
+  <main>
+    <!-- NEW PROJECT VIEW -->
+    <div id="newProjectView">
+      <div class="card">
+        <h2>1. Project, Environment &amp; Visual Style</h2>
+        <div class="grid-2">
+          <div>
+            <label>Project Name</label>
+            <input type="text" id="projectName" placeholder="e.g. Module 3 Workplace Coaching" />
+          </div>
+          <div>
+            <label>Environment / Visual Setting (Not Limited to Whiteboards!)</label>
+            <select id="environmentMode"></select>
+          </div>
+          <div>
+            <label>Banner &amp; Theme Color Palette (No Rainbows)</label>
+            <select id="bannerPalette"></select>
+          </div>
+          <div>
+            <label>Qwen-Image Speed &amp; Resolution</label>
+            <select id="useLightning">
+              <option value="true" selected>Lightning 8-Step · Native 1664×928 Sharp (~30s/scene)</option>
+              <option value="false">Standard 20-Step · Native 1664×928 Ultra Text &amp; Detail</option>
+            </select>
+          </div>
+          <div>
+            <label>Visual Director AI Brain</label>
+            <select id="ollamaModel">
+              <option value="gemma3:12b" selected>gemma3:12b (Richer worlds, props &amp; spatial layout)</option>
+              <option value="qwen2.5:7b">qwen2.5:7b (Faster lightweight director)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHATTERBOX VOICE STUDIO -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <h2 style="margin:0">2. Chatterbox Voice &amp; Audio Controls</h2>
+          <div class="row">
+            <button class="btn btn-secondary btn-sm" id="previewBtn" onclick="previewVoice()">Preview Voice</button>
+            <audio id="voicePreviewAudio" controls style="height:30px;display:none"></audio>
+          </div>
+        </div>
+        <div class="grid-4">
+          <div>
+            <label>Voice Mode</label>
+            <select id="voiceMode" onchange="populateVoiceSelect()">
+              <option value="predefined" selected>Predefined Voice</option>
+              <option value="clone">Cloned Reference Audio</option>
+            </select>
+          </div>
+          <div>
+            <label>Voice</label>
+            <select id="voiceSelect"></select>
+          </div>
+          <div>
+            <label>Whisper Alignment Model</label>
+            <select id="whisperModel">
+              <option value="base">base (fastest)</option>
+              <option value="small">small (balanced)</option>
+              <option value="medium" selected>medium (most accurate)</option>
+            </select>
+          </div>
+          <div>
+            <label>Paragraph Pause <span class="slider-val" id="valPause">0.28s</span></label>
+            <input type="range" id="ttsPause" min="0" max="1" step="0.04" value="0.28" oninput="valPause.textContent=this.value+'s'" />
+          </div>
+        </div>
+        <div class="grid-4" style="margin-top:12px">
+          <div>
+            <label>Temperature <span class="slider-val" id="valTemp">0.75</span></label>
+            <input type="range" id="ttsTemp" min="0.1" max="1.2" step="0.05" value="0.75" oninput="valTemp.textContent=this.value" />
+          </div>
+          <div>
+            <label>Exaggeration (Emotion) <span class="slider-val" id="valExag">0.50</span></label>
+            <input type="range" id="ttsExag" min="0.0" max="1.5" step="0.05" value="0.50" oninput="valExag.textContent=this.value" />
+          </div>
+          <div>
+            <label>CFG Weight (Stability) <span class="slider-val" id="valCfg">0.50</span></label>
+            <input type="range" id="ttsCfg" min="0.0" max="1.0" step="0.05" value="0.50" oninput="valCfg.textContent=this.value" />
+          </div>
+          <div>
+            <label>Speed Factor <span class="slider-val" id="valSpeed">1.00x</span></label>
+            <input type="range" id="ttsSpeed" min="0.7" max="1.4" step="0.05" value="1.00" oninput="valSpeed.textContent=this.value+'x'" />
+          </div>
+        </div>
+      </div>
+
+      <!-- CHARACTER PRESETS & FILTERING SYSTEM -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <h2 style="margin:0">3. Character Cast &amp; Preset Library</h2>
+          <div class="row">
+            <button class="btn btn-secondary btn-sm" onclick="resetCharFilters()">Reset Filters</button>
+          </div>
+        </div>
+
+        <div class="grid-4">
+          <div>
+            <label>Filter by Race / Ethnicity</label>
+            <select id="filterRace" onchange="loadFilteredCharacters()"><option value="">All Races</option></select>
+          </div>
+          <div>
+            <label>Filter by Gender</label>
+            <select id="filterGender" onchange="loadFilteredCharacters()"><option value="">All Genders</option></select>
+          </div>
+          <div>
+            <label>Filter by Age Group</label>
+            <select id="filterAge" onchange="loadFilteredCharacters()"><option value="">All Ages</option></select>
+          </div>
+          <div>
+            <label>Filter by Role / Industry</label>
+            <select id="filterRole" onchange="loadFilteredCharacters()"><option value="">All Roles</option></select>
+          </div>
+        </div>
+        <div style="margin-top:8px" class="row">
+          <input type="text" id="filterSearch" placeholder="Search characters by name, attire, ethnicity, glasses, safety vest, voice..." oninput="loadFilteredCharacters()" style="flex:1" />
+          <span class="badge" id="charCountBadge">0 presets</span>
+        </div>
+
+        <div id="charGrid" class="char-grid"></div>
+
+        <h3>Selected Primary Presenter (or Build Custom Character)</h3>
+        <div class="grid-4" style="margin-bottom:8px">
+          <input type="text" id="customRace" placeholder="Race / Ethnicity (e.g. Black African)" />
+          <input type="text" id="customGender" placeholder="Gender (e.g. Female)" />
+          <input type="text" id="customAge" placeholder="Age (e.g. late 30s)" />
+          <input type="text" id="customAttire" placeholder="Attire & Props (e.g. navy blazer, glasses)" />
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn btn-secondary btn-sm" onclick="applyCustomCharacter()">Build Description From Fields</button>
+          <button class="btn btn-secondary btn-sm" onclick="addCurrentToCast()">+ Add to Supporting Cast</button>
+          <span class="badge" id="castBadge">Supporting cast: 0</span>
+        </div>
+        <textarea id="characterDesc" style="min-height:68px" placeholder="Full visual character description injected into every scene..."></textarea>
+      </div>
+
+      <!-- SCRIPT & LAUNCH -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <h2 style="margin:0">4. Narration Script</h2>
+          <span class="badge" id="scriptStats">0 words · ~0.0 min</span>
+        </div>
+        <textarea id="scriptInput" placeholder="Paste your full narration script here (short or 15+ minutes). Separate topics with blank lines..."></textarea>
+
+        <div class="checks">
+          <label><input type="checkbox" id="enableVisionQa" checked /> Auto-QA Critic (gemma3:12b checks &amp; auto-fixes missing characters / blank bubbles)</label>
+          <label><input type="checkbox" id="reviewBeforeAnimate" checked /> Pause after Stage 4 to review &amp; re-roll scenes</label>
+          <label><input type="checkbox" id="burnCaptions" checked /> Burn synced captions in dark bar BELOW video</label>
+          <label><input type="checkbox" id="drawHand" checked /> Show drawing hand (element-by-element)</label>
+        </div>
+
+        <div class="row" style="margin-top:16px">
+          <button class="btn" id="startBtn" onclick="startPipeline()">Generate Explainer Video</button>
+          <span style="font-size:12px;color:var(--muted)">Sequential VRAM unloading active · 6–9 rich labelled objects per beat · Zero rainbow banners</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVE JOB VIEW -->
+    <div id="jobView" style="display:none">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <h2 id="jobTitle" style="margin:0 0 4px"></h2>
+            <div id="jobSubtitle" style="font-size:13px;color:var(--muted)"></div>
+          </div>
+          <div class="row">
+            <span id="jobPill" class="pill"></span>
+            <button class="btn btn-sm" id="retryBtn" style="display:none" onclick="retryJob()">Retry / Resume</button>
+            <button class="btn btn-green btn-sm" id="approveBtn" style="display:none" onclick="approveJob(false)">Approve &amp; Animate Scenes</button>
+            <button class="btn btn-secondary btn-sm" id="reanimateBtn" style="display:none" onclick="approveJob(true)">Re-Animate (Element-Complete Engine)</button>
+          </div>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="logs" id="logsBox"></div>
+      </div>
+
+      <div id="videoCard" class="card" style="display:none">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <h2 style="margin:0">Finished Explainer Video</h2>
+          <div class="row">
+            <a id="downloadVideoLink" class="btn btn-green btn-sm" download>Download MP4</a>
+            <a id="downloadAudioLink" class="btn btn-secondary btn-sm" download>Download WAV</a>
+          </div>
+        </div>
+        <video id="videoPlayer" controls></video>
+      </div>
+
+      <div id="scenesCard" class="card" style="display:none">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <h2 style="margin:0">Storyboard &amp; Generated Scenes</h2>
+          <span class="badge" id="sceneCountBadge"></span>
+        </div>
+        <div id="scenesGrid" class="scenes-grid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let activeJobId = null;
+let cachedJobs = [];
+let predefinedVoices = [];
+let referenceVoices = [];
+let selectedCharId = null;
+let supportingCast = [];
+let renderedSceneCount = -1;
+let renderedJobId = null;
+
+function showNewProject() {
+  activeJobId = null;
+  document.getElementById('newProjectView').style.display = 'block';
+  document.getElementById('jobView').style.display = 'none';
+  renderJobsSidebar();
+}
+
+document.getElementById('scriptInput').addEventListener('input', () => {
+  const words = (document.getElementById('scriptInput').value.trim().match(/\S+/g) || []).length;
+  const mins = (words / 145).toFixed(1);
+  document.getElementById('scriptStats').textContent = `${words} words · ~${mins} min`;
+});
+
+async function initPresets() {
+  const res = await fetch('/api/presets');
+  const data = await res.json();
+
+  const envSel = document.getElementById('environmentMode');
+  data.environments.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.id; opt.textContent = e.label;
+    envSel.appendChild(opt);
+  });
+
+  const palSel = document.getElementById('bannerPalette');
+  data.banner_palettes.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.label;
+    palSel.appendChild(opt);
+  });
+
+  const addOpts = (id, list) => {
+    const s = document.getElementById(id);
+    list.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; s.appendChild(o); });
+  };
+  addOpts('filterRace', data.facets.races);
+  addOpts('filterGender', data.facets.genders);
+  addOpts('filterAge', data.facets.age_groups);
+  addOpts('filterRole', data.facets.roles);
+
+  renderCharGrid(data.characters);
+  if (data.characters.length > 0) {
+    selectCharacter(data.characters[0], false);
+  }
+}
+
+async function loadFilteredCharacters() {
+  const params = new URLSearchParams({
+    race: document.getElementById('filterRace').value,
+    gender: document.getElementById('filterGender').value,
+    age_group: document.getElementById('filterAge').value,
+    role: document.getElementById('filterRole').value,
+    search: document.getElementById('filterSearch').value,
+  });
+  const res = await fetch(`/api/presets?${params.toString()}`);
+  const data = await res.json();
+  renderCharGrid(data.characters);
+}
+
+function resetCharFilters() {
+  ['filterRace', 'filterGender', 'filterAge', 'filterRole', 'filterSearch'].forEach(id => document.getElementById(id).value = '');
+  loadFilteredCharacters();
+}
+
+function renderCharGrid(chars) {
+  document.getElementById('charCountBadge').textContent = `${chars.length} preset${chars.length === 1 ? '' : 's'}`;
+  const grid = document.getElementById('charGrid');
+  grid.innerHTML = '';
+  chars.forEach(ch => {
+    const card = document.createElement('div');
+    card.className = 'char-card' + (ch.id === selectedCharId ? ' selected' : '');
+    card.onclick = () => selectCharacter(ch, true);
+    card.innerHTML = `
+      <div class="cname">${ch.name}</div>
+      <div class="tags">
+        <span class="tag">${ch.race}</span>
+        <span class="tag">${ch.gender}</span>
+        <span class="tag">${ch.age_group}</span>
+        <span class="tag">${ch.role}</span>
+      </div>
+      <div class="desc">${ch.visual_description}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+function selectCharacter(ch) {
+  selectedCharId = ch.id;
+  document.getElementById('characterDesc').value = ch.visual_description;
+  document.getElementById('customRace').value = ch.race;
+  document.getElementById('customGender').value = ch.gender;
+  document.getElementById('customAge').value = ch.age_group;
+  loadFilteredCharacters();
+}
+
+function applyCustomCharacter() {
+  const race = document.getElementById('customRace').value.trim();
+  const gender = document.getElementById('customGender').value.trim();
+  const age = document.getElementById('customAge').value.trim();
+  const attire = document.getElementById('customAttire').value.trim();
+  const parts = [race, gender, age ? `in their ${age}` : '', attire ? `wearing ${attire}` : ''].filter(Boolean);
+  if (parts.length) {
+    selectedCharId = null;
+    document.getElementById('characterDesc').value = `friendly expressive ${parts.join(', ')}`;
+  }
+}
+
+function addCurrentToCast() {
+  const desc = document.getElementById('characterDesc').value.trim();
+  if (!desc) return;
+  if (!supportingCast.includes(desc)) supportingCast.push(desc);
+  document.getElementById('castBadge').textContent = `Supporting cast: ${supportingCast.length}`;
+}
+
+function populateVoiceSelect(preferredVoice = null) {
+  const mode = document.getElementById('voiceMode').value;
+  const list = mode === 'clone' ? (referenceVoices.length ? referenceVoices : predefinedVoices) : predefinedVoices;
+  const sel = document.getElementById('voiceSelect');
+  const prev = preferredVoice || sel.value || 'Fiona.wav';
+  sel.innerHTML = '';
+  list.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    if (v === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+async function previewVoice() {
+  const btn = document.getElementById('previewBtn');
+  btn.disabled = true; btn.textContent = 'Generating sample...';
+  try {
+    const res = await fetch('/api/preview-voice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        voice: document.getElementById('voiceSelect').value || 'Fiona.wav',
+        voice_mode: document.getElementById('voiceMode').value,
+        tts_temperature: parseFloat(document.getElementById('ttsTemp').value),
+        tts_exaggeration: parseFloat(document.getElementById('ttsExag').value),
+        tts_cfg_weight: parseFloat(document.getElementById('ttsCfg').value),
+        tts_speed_factor: parseFloat(document.getElementById('ttsSpeed').value),
+      }),
+    });
+    if (!res.ok) throw new Error('Preview failed');
+    const blob = await res.blob();
+    const audio = document.getElementById('voicePreviewAudio');
+    audio.src = URL.createObjectURL(blob);
+    audio.style.display = 'inline-block';
+    audio.play();
+  } catch (e) {
+    alert('Voice preview failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Preview Voice';
+  }
+}
+
+async function refreshSystem() {
+  try {
+    const res = await fetch('/api/system');
+    const data = await res.json();
+    const v = data.vram;
+    document.getElementById('vramBadge').innerHTML = `${v.gpu_name}: <strong>${(v.used_mb/1024).toFixed(1)} / ${(v.total_mb/1024).toFixed(1)} GB VRAM</strong>`;
+    if (predefinedVoices.length === 0 && data.voices) {
+      predefinedVoices = data.voices;
+      referenceVoices = data.reference_voices || [];
+      populateVoiceSelect('Fiona.wav');
+    }
+  } catch (e) {}
+}
+
+async function refreshJobs() {
+  try {
+    const res = await fetch('/api/jobs');
+    cachedJobs = await res.json();
+    renderJobsSidebar();
+  } catch (e) {}
+}
+
+function renderJobsSidebar() {
+  const el = document.getElementById('jobsList');
+  el.innerHTML = '';
+  cachedJobs.forEach(j => {
+    const div = document.createElement('div');
+    div.className = 'job-item' + (j.job_id === activeJobId ? ' active' : '');
+    div.onclick = () => openJob(j.job_id);
+    div.innerHTML = `<div class="name">${j.project_name || j.job_id}</div>
+      <div class="meta"><span>${j.status}</span><span>${j.progress || 0}%</span></div>`;
+    el.appendChild(div);
+  });
+}
+
+async function startPipeline() {
+  const projectName = document.getElementById('projectName').value.trim() || 'Explainer Video';
+  const script = document.getElementById('scriptInput').value.trim();
+  if (script.length < 10) { alert('Please enter a script.'); return; }
+  document.getElementById('startBtn').disabled = true;
+  try {
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_name: projectName,
+        script,
+        voice: document.getElementById('voiceSelect').value || 'Fiona.wav',
+        voice_mode: document.getElementById('voiceMode').value,
+        tts_temperature: parseFloat(document.getElementById('ttsTemp').value),
+        tts_exaggeration: parseFloat(document.getElementById('ttsExag').value),
+        tts_cfg_weight: parseFloat(document.getElementById('ttsCfg').value),
+        tts_speed_factor: parseFloat(document.getElementById('ttsSpeed').value),
+        tts_paragraph_pause_sec: parseFloat(document.getElementById('ttsPause').value),
+        character_description: document.getElementById('characterDesc').value.trim(),
+        cast_characters: supportingCast,
+        banner_palette: document.getElementById('bannerPalette').value,
+        environment_mode: document.getElementById('environmentMode').value,
+        ollama_model: document.getElementById('ollamaModel').value,
+        whisper_model: document.getElementById('whisperModel').value,
+        use_lightning: document.getElementById('useLightning').value === 'true',
+        enable_vision_qa: document.getElementById('enableVisionQa').checked,
+        review_before_animate: document.getElementById('reviewBeforeAnimate').checked,
+        burn_captions: document.getElementById('burnCaptions').checked,
+        draw_hand: document.getElementById('drawHand').checked,
+      }),
+    });
+    const job = await res.json();
+    await refreshJobs();
+    openJob(job.job_id);
+  } finally {
+    document.getElementById('startBtn').disabled = false;
+  }
+}
+
+async function openJob(jobId) {
+  activeJobId = jobId;
+  document.getElementById('newProjectView').style.display = 'none';
+  document.getElementById('jobView').style.display = 'block';
+  renderJobsSidebar();
+  await pollActiveJob(true);
+}
+
+async function pollActiveJob(forceRenderScenes = false) {
+  if (!activeJobId) return;
+  try {
+    const res = await fetch(`/api/jobs/${activeJobId}`);
+    if (!res.ok) return;
+    const job = await res.json();
+
+    document.getElementById('jobTitle').textContent = job.project_name || job.job_id;
+    document.getElementById('jobSubtitle').textContent = `${job.stage_label || ''} ${job.stage_detail ? '— ' + job.stage_detail : ''}`;
+    document.getElementById('progressBar').style.width = `${job.progress || 0}%`;
+
+    const pill = document.getElementById('jobPill');
+    pill.textContent = job.status.toUpperCase();
+    pill.className = `pill pill-${job.status === 'done' ? 'done' : job.status === 'review' ? 'review' : job.status === 'error' ? 'error' : 'running'}`;
+
+    document.getElementById('retryBtn').style.display = (job.status === 'error') ? 'inline-block' : 'none';
+    document.getElementById('approveBtn').style.display = (job.status === 'review') ? 'inline-block' : 'none';
+    document.getElementById('reanimateBtn').style.display = (job.status === 'done') ? 'inline-block' : 'none';
+
+    const logsBox = document.getElementById('logsBox');
+    logsBox.textContent = (job.logs || []).join('\n');
+    logsBox.scrollTop = logsBox.scrollHeight;
+
+    const videoCard = document.getElementById('videoCard');
+    if (job.has_video && job.status === 'done') {
+      videoCard.style.display = 'block';
+      const vUrl = `/api/jobs/${job.job_id}/video?t=${Math.floor(job.updated_at || 0)}`;
+      const vp = document.getElementById('videoPlayer');
+      if (vp.dataset.src !== vUrl) { vp.dataset.src = vUrl; vp.src = vUrl; }
+      document.getElementById('downloadVideoLink').href = `/api/jobs/${job.job_id}/video`;
+      document.getElementById('downloadAudioLink').href = `/api/jobs/${job.job_id}/audio`;
+    } else {
+      videoCard.style.display = 'none';
+    }
+
+    const scenesCard = document.getElementById('scenesCard');
+    if (job.storyboard && job.storyboard.beats) {
+      scenesCard.style.display = 'block';
+      const readyMap = job.ready_scenes || {};
+      const readyCount = Object.keys(readyMap).length;
+      document.getElementById('sceneCountBadge').textContent = `${readyCount}/${job.storyboard.beats.length} scenes ready · ${job.storyboard.total_duration}s`;
+      if (forceRenderScenes || renderedJobId !== job.job_id || renderedSceneCount !== job.storyboard.beats.length) {
+        renderedJobId = job.job_id;
+        renderedSceneCount = job.storyboard.beats.length;
+        renderScenesGrid(job);
+      } else {
+        // Live-update any scene image as soon as it finishes generating without wiping prompt edits
+        job.storyboard.beats.forEach(beat => {
+          const mtime = readyMap[String(beat.beat_id)];
+          const img = document.getElementById(`scene-img-${beat.beat_id}`);
+          const ph = document.getElementById(`scene-ph-${beat.beat_id}`);
+          if (mtime && img && img.dataset.mtime !== String(mtime)) {
+            img.dataset.mtime = String(mtime);
+            img.src = `/api/jobs/${job.job_id}/scene/${beat.beat_id}?t=${mtime}`;
+            img.style.display = 'block';
+            img.style.opacity = '1';
+            if (ph) ph.style.display = 'none';
+          }
+        });
+      }
+    } else {
+      scenesCard.style.display = 'none';
+    }
+  } catch (e) {}
+}
+
+function renderScenesGrid(job) {
+  const grid = document.getElementById('scenesGrid');
+  grid.innerHTML = '';
+  const readyMap = job.ready_scenes || {};
+  job.storyboard.beats.forEach(beat => {
+    const mtime = readyMap[String(beat.beat_id)];
+    const card = document.createElement('div');
+    card.className = 'scene-card';
+    card.innerHTML = `
+      <div id="scene-ph-${beat.beat_id}" style="display:${mtime ? 'none' : 'flex'};aspect-ratio:16/9;align-items:center;justify-content:center;background:#0f172a;color:#94a3b8;font-size:13px">
+        Generating scene_${String(beat.beat_id).padStart(2,'0')}.png...
+      </div>
+      <img id="scene-img-${beat.beat_id}" data-mtime="${mtime || ''}" src="${mtime ? `/api/jobs/${job.job_id}/scene/${beat.beat_id}?t=${mtime}` : ''}" style="display:${mtime ? 'block' : 'none'}" />
+      <div class="scene-body">
+        <div class="row" style="justify-content:space-between">
+          <strong>#${String(beat.beat_id).padStart(2,'0')} · ${beat.banner_title}</strong>
+          <span class="badge">${beat.start}s–${beat.end}s (${beat.duration}s)</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">${beat.narration_text}</div>
+        <textarea id="prompt-${beat.beat_id}">${beat.image_prompt}</textarea>
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" id="reroll-btn-${beat.beat_id}" onclick="rerollBeat('${job.job_id}', ${beat.beat_id})">Re-roll Scene</button>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+async function rerollBeat(jobId, beatId) {
+  const btn = document.getElementById(`reroll-btn-${beatId}`);
+  const prompt = document.getElementById(`prompt-${beatId}`).value;
+  btn.disabled = true; btn.textContent = 'Generating...';
+  try {
+    const res = await fetch(`/api/jobs/${jobId}/reroll/${beatId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    document.getElementById(`scene-img-${beatId}`).src = `/api/jobs/${jobId}/scene/${beatId}?t=${data.ts || Date.now()}`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Re-roll Scene';
+  }
+}
+
+async function retryJob() {
+  if (!activeJobId) return;
+  await fetch(`/api/jobs/${activeJobId}/retry`, { method: 'POST' });
+  await pollActiveJob();
+}
+
+async function approveJob(forceReanimate) {
+  if (!activeJobId) return;
+  await fetch(`/api/jobs/${activeJobId}/approve?force_reanimate=${forceReanimate}`, { method: 'POST' });
+  await pollActiveJob();
+}
+
+initPresets();
+refreshSystem();
+refreshJobs();
+setInterval(() => { refreshSystem(); refreshJobs(); pollActiveJob(false); }, 3500);
+</script>
+</body>
+</html>

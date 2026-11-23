@@ -9,7 +9,11 @@ __pycache__/
 *.aab
 *.exe
 *.mp4
+!docs/showcase/*.mp4
 *.avi
+output/
+runs/
+pipeline/runs/
 test_codes/
 logs/
 bin/

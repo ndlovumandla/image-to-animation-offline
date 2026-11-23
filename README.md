@@ -1,163 +1,177 @@
-# 📷 ➜ ▶️ Offline Image to Animation Maker
-An open-source, cross-platform, offline app for Android, Linux, Windows, Mac & iOS (Mac & iOS apps are not built by us, but can be done using the documentation). Just upload an image (batch processing is possible on desktop platform by selecting a folder) & generate a sketch style animation video file(s) in seconds or munites (depends on device) without an Internet connection.
+# AI Explainer & Whiteboard Sketch Studio (100% Offline, Local AI)
 
-> Overview: The app uses KivyMD and Kivy mainly for the UI. The app uses `Numpy` & `OpenCV` as the logic backbone which generates the video from an image.
+[![CI — Build, Test & Security Scan](https://github.com/ndlovumandla/image-to-animation-offline/actions/workflows/ci.yml/badge.svg)](https://github.com/ndlovumandla/image-to-animation-offline/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg)](https://www.python.org/)
+[![100% Local AI](https://img.shields.io/badge/AI-100%25%20Local%20%26%20Offline-10b981.svg)](#local-ai--tools-stack)
 
-### 🤔 Why would you choose our app? (Features)
-👉 Generate White-board drawing style sketch animation just from an image. <br>
-👉 No internet connection is required, completely `Offline`. <br>
-👉 Available on Android, Windows & Linux. Can run on any OS using `Python`. <br>
-👉 No subscription, watermark, completely `open-source`. <br>
-👉 Configurable speed, frame rate & few other params to control the video lenght & speed. <br>
-👉 Both black & white and colour sketch options are there (First the grayscale sketch, then it will fill the colours). <br>
-👉 Now, we can choose a `folder` to create multiple videos from multiple images (all images in the selected folder) in a single batch (queue) on `desktop` versions only. [Not available on Android] <br>
+**Turn any written training or explainer script into a narrated, hand-drawn whiteboard animation video — completely offline on your own computer or GPU server, with zero per-video cloud fees.**
 
-## 📽️ Demo
-You can click on the below Image or this [Youtube Link](https://www.youtube.com/watch?v=_UuAIjSzUJQ) to see the demo. Please let me know in the comments, how do you feel about this App. <br>
-[![ImageToSketch](./docs/images/thumb.png)](https://www.youtube.com/watch?v=_UuAIjSzUJQ)
+Built on top of the open-source Kivy Offline Image-to-Animation engine, this project adds a complete **6-stage Local AI Video Production Pipeline** and **Web Studio UI**: natural AI voiceover, word-level audio alignment, intelligent storyboard direction, high-resolution scene illustration with automated Vision QA, whole-object hand-drawn animation synced to narration, and clean FFmpeg video assembly with non-overlapping captions.
 
-## 💰 Sponsor Me
-You can buy me a coffee via [this link](https://www.paypal.com/paypalme/soomnathsdas) or tap on below image. Thank you 🙏. <br>
-<a href="https://www.paypal.com/paypalme/soomnathsdas"><img src="./docs/images/donate.svg" height="40"></a>
+---
 
-## 🖧 Our Scematic Architecture
-To be added...
+## Output Video Showcase
 
-## 🧑‍💻 Quickstart Guide
+### Animated Whiteboard Sketch Preview
+![Whiteboard Hand-Drawing Animation Preview](docs/showcase/demo_preview.gif)
 
-### 📱 Download & Run the Android App
-Get the app from [Google PlayStore](https://play.google.com/store/apps/details?id=in.daslearning.imgskch) <br>
-[![Google-Play](./docs/images/google_play.svg)](https://play.google.com/store/apps/details?id=in.daslearning.imgskch) <br>
+> **Watch / Download Sample Output Video (MP4 with Voiceover & Captions):**
+> [sample_explainer_clip.mp4](docs/showcase/sample_explainer_clip.mp4)
 
-You can also check the [Releases](https://github.com/daslearning-org/image-to-animation-offline/releases) and downlaod the latest version of the android app on your phone.
+### Generated Scene Examples (1664×928 Native 16:9)
+| Scene 1 — Consistent Presenter & Office World | Scene 2 — Concept Diagram & Uniform Banner Text |
+| :---: | :---: |
+| ![Sample Scene 1](docs/showcase/sample_scene_01.png) | ![Sample Scene 2](docs/showcase/sample_scene_02.png) |
 
-> If you use the `Download` button from the app, you can save the animation video in one of the mentioned folders: `Downloads`, `Movies`, `Videos` due android file access restrictions on `Android 11+`.
+---
 
-### 💻 Download & Run the Windows or Linux App
-Get the app from [Microsoft App Store](https://apps.microsoft.com/detail/9n2w89c5rb7v?referrer=appbadge&mode=direct&hl=en-GB&gl=IN) <br>
-[![MS-Store](./docs/images/ms_store_light.svg)](https://apps.microsoft.com/detail/9n2w89c5rb7v?referrer=appbadge&mode=direct&hl=en-GB&gl=IN) <br>
+## How the System Works (6-Stage Architecture)
 
-You can check the [Releases](https://github.com/daslearning-org/image-to-animation-offline/releases) and downlaod the latest version of the app on your `Linux` or `Windows` platform. The Linux app has no extension, you may need to change the permission of the file to run it. The Windows app will have an `exe` extension, just double click & run it (You may need to create an exception for Antivirus if there is any detection).
-
-### 🐍 Run with Python
-
-1. Clone the repo
-```bash
-git clone https://github.com/daslearning-org/image-to-animation-offline.git
+```mermaid
+flowchart LR
+    S["Written Script (.txt)"] --> S1["Stage 1: Chatterbox TTS<br/>(Voiceover .wav)"]
+    S1 --> S2["Stage 2: Faster-Whisper<br/>(Word Timestamps + .srt)"]
+    S2 --> S3["Stage 3: Ollama gemma3:12b<br/>(Storyboard Director)"]
+    S3 --> S4["Stage 4: ComfyUI Qwen-Image<br/>(+ gemma3:12b Vision QA)"]
+    S4 --> R{"Human Review UI<br/>(Optional 1-Click Re-roll)"}
+    R --> S5["Stage 5: Kivy Sketch Hand<br/>+ Python/OpenCV Animator"]
+    S5 --> S6["Stage 6: FFmpeg Assembly<br/>(1080p MP4 + Caption Bar)"]
 ```
 
-2. Run the application
+Each GPU stage automatically **unloads its VRAM** when finished, allowing the entire pipeline to run reliably on a single **16 GB VRAM GPU** (e.g. RTX 5060 Ti / RTX 4060 Ti 16 GB / RTX 4080).
+
+---
+
+## Local AI & Tools Stack
+
+| Stage / Role | Tool / Local AI Model | What It Does |
+| :--- | :--- | :--- |
+| **Stage 1 — Voiceover** | **Chatterbox TTS** *(Local AI)* | Synthesizes natural paragraph-chunked narration with 29+ voices, voice cloning, and tone/speed controls. |
+| **Stage 2 — Word Timing** | **Faster-Whisper** *(Local AI)* | Generates exact word-level timestamps (`alignment.json`) and synced subtitles (`captions.srt`). |
+| **Stage 3 — Creative Director** | **Ollama (`gemma3:12b`)** *(Local Vision + Text AI)* | Plans visual beats, consistent presenter framing, rich real-world environments, and speech bubble text. |
+| **Stage 4 — Scene Illustrator & QA** | **ComfyUI + Qwen-Image (8-step Lightning / 20-step)** + **`gemma3:12b` Vision Critic** | Draws crisp 1664×928 scenes and automatically OCR-verifies banner text & spelling, auto-rerolling flawed images. |
+| **Stage 5 — Whiteboard Animator** | **Kivy Image-to-Sketch Assets + Python/OpenCV Whole-Object Animator** | Segments complete people and objects (never slicing characters in half) and animates a drawing hand in sync with spoken phrases. |
+| **Stage 6 — Final Video Editor** | **FFmpeg** | Joins animated clips with narration and places subtitles in a dedicated dark bar below the canvas (1920×1080 MP4, zero overlap). |
+| **Studio Control Panel** | **FastAPI + Single-Page Web UI** (`pipeline/web_ui.py`) | Browser studio with live GPU VRAM monitor, 24 character presets, voice preview, live scene gallery, and 1-click Re-roll. |
+
+---
+
+## Quickstart — Fork & Run Locally
+
+### Prerequisites
+- **Python 3.11 or 3.12**
+- **FFmpeg & FFprobe** installed and available on your `PATH`
+- **Local AI Services** (for full 6-stage video generation; runs on `127.0.0.1` by default):
+  - **Ollama** (`http://127.0.0.1:11434`) with `ollama pull gemma3:12b`
+  - **ComfyUI** (`http://127.0.0.1:8188`) with Qwen-Image FP8/INT8 + Lightning LoRA
+  - **Chatterbox TTS Server** (`http://127.0.0.1:8004`)
+  - *(Ubuntu GPU server helper script included at `pipeline/setup_gpu_server.sh`)*
+
+### 1. Fork & Clone
 ```bash
-cd image-to-animation-offline/kivy/
-pip install -r requirements.txt # virtual environment is recommended
+git clone https://github.com/ndlovumandla/image-to-animation-offline.git
+cd image-to-animation-offline
+```
+
+### 2. Create Virtual Environment & Install Dependencies
+```bash
+python -m venv .venv
+
+# Linux / macOS:
+source .venv/bin/activate
+# Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+
+pip install --upgrade pip
+pip install -r pipeline/requirements.txt
+```
+
+### 3. Configure Environment Variables (Optional)
+Copy `.env.example` to `.env` if your AI services run on a different machine or custom ports. By default, everything connects to `127.0.0.1`:
+```bash
+cp .env.example .env
+```
+
+Key environment variables:
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `SKETCH_GPU_HOST` | `127.0.0.1` | Hostname or IP running Chatterbox, Ollama, and ComfyUI |
+| `CHATTERBOX_URL` | `http://127.0.0.1:8004` | Chatterbox TTS API URL |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama API URL |
+| `COMFYUI_URL` | `http://127.0.0.1:8188` | ComfyUI API URL |
+| `SKETCH_RUNS_DIR` | `./runs` | Directory where generated projects and MP4s are saved |
+| `FFMPEG_BIN` | `ffmpeg` | Path to `ffmpeg` executable |
+| `FFPROBE_BIN` | `ffprobe` | Path to `ffprobe` executable |
+
+### 4. Launch the Web Studio UI
+```bash
+uvicorn pipeline.web_ui:app --host 0.0.0.0 --port 8090
+```
+Open **`http://localhost:8090`** in your browser:
+1. Paste your training or explainer script.
+2. Pick a **Chatterbox Voice** (preview it directly in the UI) and choose a **Presenter Character**, **Environment**, and **Banner Palette**.
+3. Click **Generate Video** — watch scenes appear live, click **Re-roll** on any slide you want regenerated, then click **Approve & Animate** to render the final 1080p MP4.
+
+### 5. Or Run via Command Line (CLI)
+```bash
+python -m pipeline.run_pipeline \
+  --script my_script.txt \
+  --output-dir ./runs/my_video \
+  --gpu-host 127.0.0.1 \
+  --voice Fiona.wav \
+  --ollama-model gemma3:12b \
+  --burn-captions
+```
+Supports crash-safe resume with `--from-stage N --to-stage M` (`1` through `6`).
+
+---
+
+## Standalone Kivy Image-to-Animation Desktop App
+You can still run the original lightweight offline Kivy app to turn any single image (or folder of images) into a whiteboard sketch video without any AI services:
+```bash
+cd kivy
+pip install -r requirements.txt
 python main.py
 ```
 
-## 🦾 Build your own App
-The Kivy project has a great tool named [Buildozer](https://buildozer.readthedocs.io/en/latest/) which can make mobile apps for `Android` & `iOS`
+---
 
-### 📱 Build Android App
-A Linux environment is recommended for the app development. If you are on Windows, you may use `WSL` or any `Virtual Machine`. As of now the `buildozer` tool works on Python version `3.11` at maximum. I am going to use Python `3.11`
-
+## Running Automated Tests Locally
+The test suite runs **100% offline without a GPU or external AI services**, validating configuration, character presets, prompt compilation, workflow JSONs, whole-object animation rendering, and FastAPI Web Studio endpoints:
 ```bash
-# add the python repository
-sudo add-apt-repository ppa:deadsnakes/ppa
-sudo apt update
-
-# install all dependencies.
-sudo apt install -y ant autoconf automake ccache cmake g++ gcc lbzip2 libffi-dev libltdl-dev libtool libssl-dev make openjdk-17-jdk patch patchelf pkg-config unzip wget zip git python3.11 python3.11-venv python3.11-dev # python3-dev python3-pip (if required)
-
-# optionally you may check the java installation with below commands
-java -version
-javac -version
-
-# install python modules
-git clone https://github.com/daslearning-org/image-to-animation-offline.git
-cd image-to-animation-offline/kivy/
-python3.11 -m venv .env # create python virtual environment
-source .env/bin/activate
-pip install -r req_android.txt
-
-# build the android apk
-buildozer android debug # this may take a good amount of time for the first time & will generate the apk in the bin directory
+pip install pytest httpx
+pytest tests/test_pipeline.py -v
 ```
 
-### 🖳 Build Computer Application (Windows / Linux / MacOS)
-A `Python` virtual environment is recommended and please follow the same steps from above till the pip module installations (do not require buildozer for desktop apps). It builds a native app depending on the OS type i.e. `.exe` if you are running `PyInstaller` from a Windows machine. Build computer apps from [docker image](https://hub.docker.com/r/cdrx/pyinstaller-windows) for any OS type.
+---
 
-```bash
-# install pyinstaller
-pip install pyinstaller
-
-# generate the spec file <<OPTIONAL>>
-pyinstaller --name "dlDesktop" --windowed --onefile main.py # optional as it is already created in the repo
-
-# then update the spec file as needed
-# then build your app which will be native to the OS i.e. Linux or Windows or MAC
-pyinstaller dlDesktop.spec
+## Repository Structure
+```text
+├── pipeline/                  # 6-Stage Local AI Video Sketch Studio
+│   ├── config.py              # Central portable configuration (defaults to 127.0.0.1)
+│   ├── characters.py          # 24 diverse presenter presets, palettes & environments
+│   ├── stage1_tts.py          # Paragraph-chunked Chatterbox TTS + VRAM unload
+│   ├── stage2_whisper.py      # Faster-Whisper word-level alignment + SRT
+│   ├── stage3_director.py     # Batched Ollama Visual Director + prompt compiler
+│   ├── stage4_comfyui.py      # ComfyUI Qwen-Image client + Vision Auto-QA Critic
+│   ├── stage5_animate.py      # Whole-object whiteboard hand animator (OpenCV)
+│   ├── stage6_assemble.py     # FFmpeg 1080p assembly + non-overlapping caption bar
+│   ├── web_ui.py              # FastAPI backend & job orchestrator
+│   ├── ui/index.html          # Web Studio UI
+│   ├── workflows/             # ComfyUI Qwen-Image Lightning & Standard JSON workflows
+│   └── requirements.txt       # Pipeline & Web Studio Python dependencies
+├── kivy/                      # Standalone Kivy Offline Image-to-Animation App + hand sprites
+├── tests/                     # Offline pytest suite (run automatically in GitHub Actions)
+├── docs/showcase/             # Demo GIF, sample MP4 clip, and generated scene previews
+├── .github/workflows/         # GitHub Actions CI & CD workflows
+└── LICENSE                    # MIT License
 ```
 
-#### Build Windows exe from Linux
+---
 
-* Install Wine
-```bash
-# Add the Wine repository key
-sudo mkdir -pm755 /etc/apt/keyrings
-sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+## Contributing & License
+Pull requests, new character presets, workflow improvements, and bug fixes are welcome! Please run `pytest tests/test_pipeline.py -v` before opening a PR.
 
-# Add the Wine repository for your Linux Mint version
-# For Linux Mint 21.x (Vanessa, Virginia, Victoria - based on Ubuntu 22.04 Jammy Jellyfish)
-# Replace 'jammy' with your Ubuntu base codename if different (e.g., 'focal' for Mint 20.x)
-sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
-
-# Update package lists
-sudo apt update
-
-# Install Wine (Stable branch is usually recommended)
-sudo apt install --install-recommends winehq-stable
-
-# If you need 32-bit support (highly recommended for Python/PyInstaller compatibility)
-# This command typically handles it, but if you encounter issues later, ensure 32-bit architecture is enabled:
-sudo dpkg --add-architecture i386
-sudo apt update
-sudo apt install wine32 # This might be pulled by winehq-stable, but good to ensure
-```
-
-* Download Windows Python from [official page](https://www.python.org/downloads/windows/) and then install
-```bash
-# Navigate to where you downloaded the Python installer
-cd ~/Downloads
-
-# Run the installer using wine
-# Replace 'python-3.9.13-amd64.exe' with the actual filename you downloaded
-wine python-3.9.13-amd64.exe
-```
-
-* Then run the development
-```bash
-cd kivy/
-wine pip install pyinstaller
-wine pip install -r requirements.txt
-# Also install kivy-deps.sdl2, kivy-deps.glew, kivy-deps.angle explicitly if not pulled by Kivy/KivyMD
-wine pip install kivy-deps.sdl2 kivy-deps.glew kivy-deps.angle
-
-# Replace 'Python39' with your installed Python version in Wine
-wine pyinstaller dlDesktop.spec # exe will be in the dist folder
-```
-
-## 🐞 Issues
-There can be few issues & some solutions around it.
-
-### Android Issues
-
-* Sometimes the apk might not get installed. You may enable `Developer Options` > `USB Debugging` and run below command with [adb tool](https://developer.android.com/tools/adb).
-```bash
-# check your packages (it may not show the uninstalled version, some leftover may cause the issue)
-adb shell pm list packages | grep imgskch
-
-# uninstall cleans it
-adb uninstall in.daslearning.imgskch
-
-# you may use buildozer deploy run to check the adb
-buildozer android debug deploy run
-```
+- Licensed under the **MIT License** — see [LICENSE](LICENSE).
+- Built upon the open-source Kivy image-to-animation foundation by [daslearning-org/image-to-animation-offline](https://github.com/daslearning-org/image-to-animation-offline).

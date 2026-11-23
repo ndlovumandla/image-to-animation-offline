@@ -8,7 +8,14 @@ import json
 import datetime
 import cv2
 import numpy as np
-from kivy.clock import Clock
+try:
+    from kivy.clock import Clock
+except ImportError:
+    class _HeadlessClock:
+        @staticmethod
+        def schedule_once(fn, timeout=0):
+            return fn(timeout)
+    Clock = _HeadlessClock()
 
 # global variables
 if getattr(sys, 'frozen', False):
